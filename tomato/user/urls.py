@@ -4,5 +4,5 @@ from .views import ListUser,DetailedUser
 
 urlpatterns = [
     path('list/', ListUser.as_view(), name='user-list'),
-    path('detailed/<int:pk>',DetailedUser.as_view(),name = 'detailed-list')
+    path('detailed/<int:pk>',DetailedUser.as_view(),name = 'detailed-list'),
 ]
