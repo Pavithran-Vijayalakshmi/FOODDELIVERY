@@ -1,6 +1,11 @@
 from django.urls import path
 from .views import restaurantsList
+from rest_framework.routers import SimpleRouter
 
-urlpatterns = [
-    path('list/', restaurantsList.as_view(), name='restaurants-list'),
-]
+router = SimpleRouter()
+router.register(
+    'List of Restaurants', restaurantsList , basename= ' ListOfRestaurants'
+)
+
+
+urlpatterns = [] + router.urls

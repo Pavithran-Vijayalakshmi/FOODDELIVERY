@@ -4,7 +4,6 @@ from django.db import models
 class restaurantsModel(models.Model):
     id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=100)
-    description = models.TextField()
     phone = models.CharField(max_length=15)
     email = models.EmailField()
     address = models.TextField()
