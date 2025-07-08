@@ -13,3 +13,4 @@ class userClass(models.Model):
     ]
     user_type = models.CharField(max_length=10,choices=user_type_choices)
     created_at = models.DateTimeField(auto_now_add=True)
+
