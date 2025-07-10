@@ -1,14 +1,14 @@
 from django.db import models
 from phonenumber_field.modelfields import PhoneNumberField
 import uuid
-
+from django.contrib.auth.models import AbstractUser
 
 # Register your models here.
-class user(models.Model):
+class user(AbstractUser):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100)
     email = models.EmailField()
-    phone = PhoneNumberField(unique=True, region='IN') 
+    phone = PhoneNumberField(region='IN') 
     user_type_choices= [
         ('customer', 'Customer'),
         ('admin', 'Admin'),

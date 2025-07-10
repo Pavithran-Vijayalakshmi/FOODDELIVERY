@@ -175,3 +175,5 @@ REST_FRAMEWORK = {
 
 LOGIN_REDIRECT_URL = 'authentication:login'
 LOGIN_REDIRECT_URL = reverse_lazy('restaurants:List Of Restaurants')
+
+AUTH_USER_MODEL = 'user.user'

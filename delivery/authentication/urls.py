@@ -1,10 +1,8 @@
 from django.urls import path,include
-from .views import LoginView, home
-
-app_name = 'authentication'
+from .views import RegisterView, LoginView
 
 urlpatterns = [
-    path('restaurants/',home, name = 'home'),
-    path('signup/',LoginView, name = "signup" ),
+    path('signup/', RegisterView.as_view(), name='signup'),
+    path('login/', LoginView.as_view(), name='login'),
     path('accounts/',include('django.contrib.auth.urls')),
 ]
