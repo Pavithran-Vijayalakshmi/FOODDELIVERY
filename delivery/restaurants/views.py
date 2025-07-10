@@ -1,6 +1,6 @@
 # users/views.py
 from rest_framework.views import APIView
-from rest_framework.generics import ListCreateAPIView,RetrieveUpdateDestroyAPIView
+from rest_framework.generics import ListAPIView,RetrieveUpdateDestroyAPIView
 from rest_framework.response import Response
 from .models import restaurants, MenuItems, rating,Cart,OrderItems
 from .serializer import restaurantsSerializer,MenuItemSerializer,ratingSerializer,CartSerializer,OrderItemSerializer
@@ -11,7 +11,7 @@ from rest_framework.permissions import AllowAny
 
 
 
-class restaurantsList(ListCreateAPIView):  
+class restaurantsList(ListAPIView):  
     permission_classes = [AllowAny] 
     serializer_class = restaurantsSerializer
     def get_queryset(self):

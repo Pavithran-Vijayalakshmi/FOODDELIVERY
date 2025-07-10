@@ -2,6 +2,8 @@ from django.urls import path
 from .views import restaurantsList, MenuList, orderItemsList, Ratings, CartList
 from rest_framework.routers import SimpleRouter
 
+app_name = 'restaurants'
+
 router = SimpleRouter()
 router.register(
     'menu-items', MenuList, basename='menuitems'
@@ -17,5 +19,5 @@ router.register(
 )
 
 urlpatterns = [
-    path('ListofRestaurants/', restaurantsList.as_view() ,name = ' List Of Restaurants')
+    path('listofrestaurants/', restaurantsList.as_view() ,name = 'List Of Restaurants')
     ]+router.urls
