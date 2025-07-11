@@ -20,5 +20,5 @@ class CartView(APIView):
         serializer = OrderCartSerializer(data = request.data, context={'request': request})
         if serializer.is_valid():
             serializer.save()
-            return Response({"message": "Added to Cart"}, status=status.HTTP_201_CREATED)
+            return Response({"message": "Order Created"}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status = status.HTTP_400_BAD_REQUEST)
