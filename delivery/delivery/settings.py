@@ -15,7 +15,7 @@ from pathlib import Path
 import os
 from django.urls import reverse_lazy
 from datetime import timedelta
-
+from decouple import config
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -90,31 +90,28 @@ WSGI_APPLICATION = 'delivery.wsgi.application'
 #     }
 # }
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": "FoodDelivery",
-        "USER": "foodDeliveryUser",
-        "PASSWORD": "raju",
-        "HOST": "localhost",
-        "PORT": "5432",
-    }
-}
-
-# import os
-
-# import os
-
 # DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': os.environ.get("POSTGRES_DB"),
-#         'USER': os.environ.get("POSTGRES_USER"),
-#         'PASSWORD': os.environ.get("POSTGRES_PASSWORD"),
-#         'HOST': os.environ.get("DB_HOST", "localhost"),
-#         'PORT': os.environ.get("DB_PORT", 5432),
+#     "default": {
+#         "ENGINE": "django.db.backends.postgresql",
+#         "NAME": "FoodDelivery",
+#         "USER": "foodDeliveryUser",
+#         "PASSWORD": "raju",
+#         "HOST": "localhost",
+#         "PORT": "5432",
 #     }
 # }
+
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': config("POSTGRES_DB"),
+        'USER': config("POSTGRES_USER"),
+        'PASSWORD': config("POSTGRES_PASSWORD"),
+        'HOST': config("DB_HOST", "localhost"),
+        'PORT': config("DB_PORT", 5432),
+    }
+}
 
 
 
