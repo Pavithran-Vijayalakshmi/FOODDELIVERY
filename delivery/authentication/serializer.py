@@ -3,6 +3,8 @@ from django.contrib.auth import get_user_model
 from rest_framework.authentication import authenticate
 
 User = get_user_model()
+
+from orders.models import orders
 class LoginSerializer(serializers.Serializer):
     
     username = serializers.CharField(required=True)
@@ -26,3 +28,5 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         return User.objects.create_user(**validated_data)
+    
+
