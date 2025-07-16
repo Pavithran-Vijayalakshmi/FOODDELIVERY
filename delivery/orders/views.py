@@ -5,6 +5,7 @@ from .models import Cart, orders, OrderItem
 from .serializer import CartCreateSerializer, CartItemUpdateSerializer, CartSerializer, OrderSerializer, OrderItemSerializer
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
+from user.models import SavedAddress
 
 
 class CartCreateView(APIView):
@@ -175,27 +176,32 @@ class OrderListView(APIView):
     
 
 
-class OrderCreateView(APIView):
+class OrderCreateView(APIView): 
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        
         user = request.user
 
         if user.user_type != 'Customer':
-            return Response({"error": "Only customers can view their cart."}, status=status.HTTP_403_FORBIDDEN)
-        
-        
-        cart_items = Cart.objects.filter(user=user)
+            return Response({"error": "Only customers can place orders."}, status=status.HTTP_403_FORBIDDEN)
 
+        cart_items = Cart.objects.filter(user=user)
         if not cart_items.exists():
             return Response({"error": "Cart is empty"}, status=status.HTTP_400_BAD_REQUEST)
 
-        delivery_address = request.data.get('delivery_address')
-        if not delivery_address:
-            return Response({"error": "delivery_address is required"}, status=status.HTTP_400_BAD_REQUEST)
+        # Get address_id from query params or request body
+        address_id = request.query_params.get('address_id') or request.data.get('address_id')
+        if not address_id:
+            return Response({"error": "address_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Group items by restaurant
+        try:
+            saved_address = SavedAddress.objects.get(id=address_id, user=user)
+        except SavedAddress.DoesNotExist:
+            return Response({"error": "Address not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        delivery_address = saved_address.address
+
+        # Group cart items by restaurant
         restaurant_groups = {}
         for item in cart_items:
             rest_id = item.menu_item.restaurant.id
@@ -207,7 +213,7 @@ class OrderCreateView(APIView):
             restaurant = items[0].menu_item.restaurant
             total_amount = sum(i.menu_item.price * i.quantity for i in items)
 
-            # Create the order
+            # Create order
             order = orders.objects.create(
                 user=user,
                 restaurant=restaurant,
@@ -226,12 +232,11 @@ class OrderCreateView(APIView):
 
             created_orders.append(order)
 
-        # Clear the cart
+        # Clear the cart after order placement
         cart_items.delete()
 
         serialized_orders = OrderSerializer(created_orders, many=True)
-        return Response({"message": "Orders placed successfully", "orders": serialized_orders.data }, status=status.HTTP_201_CREATED)
-
+        return Response({"message": "Orders placed successfully", "orders": serialized_orders.data}, status=status.HTTP_201_CREATED)
 
 class CancelOrderView(APIView):
     permission_classes = [IsAuthenticated]

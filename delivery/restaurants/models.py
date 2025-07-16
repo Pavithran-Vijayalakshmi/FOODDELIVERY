@@ -1,6 +1,5 @@
 from django.db import models
 import uuid
-from user.models import user
 from django.conf import settings
 
 class restaurants(models.Model):
@@ -38,6 +37,10 @@ class MenuItem(models.Model):
     category = models.CharField(max_length=50)
     image_url = models.TextField(null=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ('restaurant', 'name')
+
 
     def __str__(self):
         return self.name

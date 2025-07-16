@@ -2,7 +2,9 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from .models import restaurants, MenuItem
-from .serializer import RestaurantListSerializer, RestaurantDetailSerializer, MenuItemSerializer, RestaurantCreateSerializer, MenuItemUpdateSerializer
+from .serializer import (RestaurantListSerializer, RestaurantDetailSerializer,
+                         MenuItemSerializer, RestaurantCreateSerializer, 
+                         MenuItemUpdateSerializer, MenuItemCreateSerializer)
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import IsAuthenticatedOrReadOnly,AllowAny,IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
@@ -82,7 +84,7 @@ class MenuCreateView(APIView):
         except restaurants.DoesNotExist:
             return Response({"error": "Restaurant not found or not owned by user"}, status=status.HTTP_404_NOT_FOUND)
 
-        serializer = MenuItemSerializer(data=request.data)
+        serializer = MenuItemCreateSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save(restaurant=restaurant)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -206,3 +208,15 @@ class RestaurantMenuView(APIView):
         
         
 
+class AllMenuItemsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+
+        if user.user_type != 'Customer':
+            return Response({'error': 'Only customers can view menu items.'}, status=status.HTTP_403_FORBIDDEN)
+
+        menu_items = MenuItem.objects.filter(is_available=True).select_related('restaurant')
+        serializer = MenuItemSerializer(menu_items, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
