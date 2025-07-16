@@ -1,9 +1,14 @@
 from django.urls import path
-from . import views
-from .views import ListUser,DetailedUser,currentUserview
+from .views import UserListView, UserDetailView, MeView,UserCreateView
+from restaurants.views import RestaurantMenuView
+
+
+app_name = "user"
 
 urlpatterns = [
-    path('list/', ListUser.as_view(), name='user-list'),
-    path('me/',currentUserview.as_view(), name = 'me'),
-    path('userdetail/<str:email>/', DetailedUser.as_view(), name='user-detail'),
+    path('', UserListView.as_view(), name='user-list'),
+    path('create/',UserCreateView.as_view(),name= 'user-create'),
+    path('<uuid:pk>/', UserDetailView.as_view(), name='user-detail'),
+    path('me/', MeView.as_view(), name='user-me'), 
+    path('restaurant/menu/', RestaurantMenuView.as_view(), name='restaurant-menu'),
 ]

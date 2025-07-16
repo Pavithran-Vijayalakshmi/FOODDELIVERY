@@ -1,28 +1,40 @@
 from rest_framework import serializers
-from .models import restaurants, MenuItems, rating,Cart,OrderItems
+from .models import restaurants, MenuItem
 
-class restaurantsSerializer(serializers.ModelSerializer):
+class RestaurantListSerializer(serializers.ModelSerializer):
     class Meta:
         model = restaurants
-        fields = ["name","phone","email","address","opening_time","closing_time","is_open"]
-        
+        fields = [
+            'id', 'name','city',
+        ]
+
+class RestaurantDetailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = restaurants
+        fields = [
+            'id', 'name','city', 'description', 'phone', 'email',
+            'address', 'opening_time', 'closing_time', 'is_open', 'created_at',
+        ]
+
+class RestaurantCreateSerializer(serializers.ModelSerializer):
+    # password = serializers.CharField(write_only = True)
+    class Meta:
+        model = restaurants
+        fields = [
+            'name','city','description','phone','email','address','opening_time','closing_time','is_open',
+        ]
+
+    def create(self, validated_data):
+        return restaurants.objects.create(**validated_data)
+    
+
 class MenuItemSerializer(serializers.ModelSerializer):
     class Meta:
-        model = MenuItems
+        model = MenuItem
         fields = '__all__'
-        
-class ratingSerializer(serializers.ModelSerializer):
+        read_only_fields = ['restaurant']
+    
+class MenuItemUpdateSerializer(serializers.ModelSerializer):
     class Meta:
-        model = rating
-        fields = '__all__'
-        
-class CartSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Cart
-        fields = '__all__'
-        
-class OrderItemSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = OrderItems
-        fields = '__all__'
-
+        model = MenuItem
+        fields = ['name', 'description', 'price', 'category']

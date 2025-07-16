@@ -1,37 +1,54 @@
-# users/views.py
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework import status
 from .models import user
-from .serializer import userSerializer
-from rest_framework.response import Response
-from rest_framework.permissions import AllowAny,IsAuthenticated
-from rest_framework.generics import ListCreateAPIView,RetrieveUpdateDestroyAPIView
+from .serializer import UserSerializer,UserCreateSerializer
+from django.shortcuts import get_object_or_404
+from rest_framework.permissions import IsAuthenticated
 
-class ListUser(ListCreateAPIView):
-    permission_classes = [IsAuthenticated]
-    serializer_class = userSerializer
+
+class UserListView(APIView):
     
-    def get(self,request):
-        queryset = self.get_queryset()
-        serializer = self.serializer_class(queryset, many = True)
+    def get_queryset(self):
+        return user.objects.all()
+    
+    def get(self, request):
+        users = self.get_queryset()
+        serializer = UserSerializer(users, many=True)
+        return Response(serializer.data)
+class UserCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        serializer = UserCreateSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class UserDetailView(APIView):
+    def get(self, request, pk):
+        user = get_object_or_404(user, pk=pk)
+        serializer = UserSerializer(user)
         return Response(serializer.data)
 
-    def get_queryset(self):
-        queryset = user.objects.all()
-        name = self.request.query_params.get('name')
-        if name:
-            queryset = queryset.filter(name=name)  # or use icontains for case-insensitive partial matches
-        return queryset
+    def put(self, request, pk):
+        user = get_object_or_404(user, pk=pk)
+        serializer = UserSerializer(user, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        User = get_object_or_404(user, pk=pk)
+        User.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
     
-class DetailedUser(RetrieveUpdateDestroyAPIView):
-    permission_classes = [AllowAny]
-    queryset = user.objects.all()
-    serializer_class = userSerializer
-
-
-class currentUserview(APIView):
+    
+class MeView(APIView):
     permission_classes = [IsAuthenticated]
-    
-    def get(self,request):
-        serializer = userSerializer(request.user)
+
+    def get(self, request):
+        serializer = UserSerializer(request.user)
         return Response(serializer.data)
