@@ -1,6 +1,8 @@
+from datetime import timedelta
+from django.utils import timezone
 from rest_framework import serializers
 from ratings.models import rating
-from .models import restaurants, MenuItem
+from .models import restaurants, MenuItem, Offer
 from django.db.models import Avg
 
 class RestaurantListSerializer(serializers.ModelSerializer):
@@ -82,8 +84,18 @@ class MenuItemUpdateSerializer(serializers.ModelSerializer):
         
         
 class MenuItemCreateSerializer(serializers.ModelSerializer):
-
     class Meta:
         model = MenuItem
         fields = ['id', 'name', 'description', 'price', 'category', 'image_url',
                 'is_available']
+        
+        
+class OfferSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Offer
+        fields = '__all__'
+        
+    def create(self, validated_data):
+        return Offer.objects.create(**validated_data)
+        
+    

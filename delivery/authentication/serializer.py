@@ -6,6 +6,25 @@ from rest_framework.authentication import authenticate
 User = get_user_model()
 restaurant = get_user_model()
 from orders.models import orders
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
+
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        token['user_type'] = user.user_type
+        return token
+
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        data['user_type'] = self.user.user_type
+        return data
+
+
+
+
 class LoginSerializer(serializers.Serializer):
     
     username = serializers.CharField(required=True)

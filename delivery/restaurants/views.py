@@ -4,7 +4,8 @@ from rest_framework import status
 from .models import restaurants, MenuItem
 from .serializer import (RestaurantListSerializer, RestaurantDetailSerializer,
                          MenuItemSerializer, RestaurantCreateSerializer, 
-                         MenuItemUpdateSerializer, MenuItemCreateSerializer)
+                         MenuItemUpdateSerializer, MenuItemCreateSerializer,
+                         OfferSerializer)
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import IsAuthenticatedOrReadOnly,AllowAny,IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
@@ -220,3 +221,19 @@ class AllMenuItemsView(APIView):
         menu_items = MenuItem.objects.filter(is_available=True).select_related('restaurant')
         serializer = MenuItemSerializer(menu_items, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    
+
+class OfferCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        # Ensure user is a restaurant owner
+        if request.user.user_type != 'RestaurantOwner':
+            return Response({"error": "Only restaurant owners can create offers."}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = OfferSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
