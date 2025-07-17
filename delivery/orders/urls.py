@@ -17,6 +17,6 @@ urlpatterns = [
     path('cart/item/delete/', CartItemDeleteView.as_view(), name='cart-item-delete'),
     
     path('orderlist/', OrderListView.as_view(), name='order-list'),
-    path('create/', OrderCreateView.as_view(), name='cancel-order'),
+    path('create/', OrderCreateView.as_view(), name='create-order'),
     path('cancel/', CancelOrderView.as_view(), name='cancel-order'),
 ]

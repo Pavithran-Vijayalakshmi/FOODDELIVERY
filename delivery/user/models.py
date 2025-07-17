@@ -24,6 +24,7 @@ from phonenumber_field.modelfields import PhoneNumberField
 from restaurants.models import restaurants,MenuItem
 from django.core.exceptions import ValidationError
 from django.db.models import Q
+from coupons.models import Coupon
 
 
 
@@ -33,6 +34,7 @@ class user(AbstractUser):
     name = models.CharField(max_length=100)
     email = models.EmailField(unique=True)
     phone = PhoneNumberField(unique=True, region='IN')
+    applied_coupon = models.ForeignKey(Coupon, null=True, blank=True, on_delete=models.SET_NULL)
     
 
     USER_TYPE_CHOICES = (
@@ -48,6 +50,9 @@ class user(AbstractUser):
 
     def __str__(self):
         return self.username
+    
+    
+    pass
     
     
 class favorite(models.Model):

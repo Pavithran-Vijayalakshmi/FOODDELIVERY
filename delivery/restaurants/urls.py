@@ -9,6 +9,7 @@ from .views import (
     MenuItemDeleteView,
     MenuItemUpdateView,
     OfferCreateView,
+    UserRestaurantsListView
 )
 
 app_name = "restaurants"
@@ -23,4 +24,6 @@ urlpatterns = [
     path('menu/update/', MenuItemUpdateView.as_view(), name='menu-item-update'),
     path('menu/delete/', MenuItemDeleteView.as_view(), name='menu-item-delete'),
     path('offers/create/', OfferCreateView.as_view(), name='create-offer'),
+    path('registered/restaurants/',UserRestaurantsListView.as_view(), name='registered-restaurants' )
+    
 ]

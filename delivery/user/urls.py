@@ -4,8 +4,8 @@ from .views import (UserListView, UserDetailView, UserCreateView,
                     FavoriteCreateView,FavoriteUpdateView,FavoriteDeleteView,
                     SavedAddressListCreateView, SavedAddressUpdateDeleteView)
 
-from restaurants.views import RestaurantMenuView
-
+from restaurants.views import RestaurantMenuView, UserRestaurantsListView
+from coupons.views import ApplyCouponView, CreateCouponView, RemoveCouponView
 
 app_name = "user"
 
@@ -22,4 +22,8 @@ urlpatterns = [
     path('addresses/', SavedAddressListCreateView.as_view(), name='saved-address-list-create'),
     path('addresses/delete/', SavedAddressUpdateDeleteView.as_view(), name='saved-address-update-delete'),
     path('addresses/update/', SavedAddressUpdateDeleteView.as_view(), name='saved-address-list-create'),
+    path('coupons/apply/', ApplyCouponView.as_view(), name='apply-coupon'),
+    path('createcoupon/', CreateCouponView.as_view(), name= 'create-coupon'),
+    path('removecoupon/',RemoveCouponView.as_view(), name='remove-coupon'),
+    
 ]

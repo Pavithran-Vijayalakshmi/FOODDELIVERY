@@ -22,12 +22,13 @@ class RestaurantDetailSerializer(serializers.ModelSerializer):
     average_rating = serializers.SerializerMethodField()
     total_ratings = serializers.SerializerMethodField()
     menu_items = serializers.SerializerMethodField()
+    offers = serializers.SerializerMethodField()
 
     class Meta:
         model = restaurants
         fields = ['id', 'name', 'description', 'city','address', 'phone', 'email',
                   'opening_time', 'closing_time', 'is_open', 'created_at',
-                  'average_rating', 'total_ratings', 'menu_items']
+                  'average_rating', 'total_ratings', 'menu_items', 'offers']
 
     def get_average_rating(self, obj):
         if rating.objects.filter(restaurant=obj) is not None:
@@ -42,6 +43,11 @@ class RestaurantDetailSerializer(serializers.ModelSerializer):
     def get_menu_items(self, obj):
         items = MenuItem.objects.filter(restaurant=obj)
         return MenuItemSerializer(items, many=True).data
+    
+    def get_offers(self, obj):
+        current_time = timezone.now()
+        offers = Offer.objects.filter(restaurant=obj, start_time__lte=current_time, end_time__gte=current_time)
+        return OfferSerializer(offers, many=True).data
     
     
 class RestaurantCreateSerializer(serializers.ModelSerializer):
@@ -59,12 +65,13 @@ class RestaurantCreateSerializer(serializers.ModelSerializer):
 class MenuItemSerializer(serializers.ModelSerializer):
     average_rating = serializers.SerializerMethodField()
     total_ratings = serializers.SerializerMethodField()
+    offers = serializers.SerializerMethodField()
 
     class Meta:
         model = MenuItem
         fields = ['id', 'name', 'description', 'price', 'category', 'image_url',
                    'restaurant','is_available', 'created_at',
-                  'average_rating', 'total_ratings']
+                  'average_rating', 'total_ratings', 'offers']
 
     def get_average_rating(self, obj):
         if rating.objects.filter(menu_item=obj) is not None:
@@ -76,6 +83,11 @@ class MenuItemSerializer(serializers.ModelSerializer):
 
     def get_total_ratings(self, obj):
         return rating.objects.filter(menu_item=obj).count()
+    
+    def get_offers(self, obj):
+        current_time = timezone.now()
+        offers = Offer.objects.filter(menu_item=obj, start_time__lte=current_time, end_time__gte=current_time)
+        return OfferSerializer(offers, many=True).data
     
 class MenuItemUpdateSerializer(serializers.ModelSerializer):
     class Meta:

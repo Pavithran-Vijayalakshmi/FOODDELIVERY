@@ -1,6 +1,9 @@
 from django.db import models
 from user.models import user
 from restaurants.models import restaurants, MenuItem
+from coupons.models import Coupon
+
+
 import uuid
 
 class Cart(models.Model):
@@ -8,6 +11,8 @@ class Cart(models.Model):
     menu_item = models.ForeignKey(MenuItem, on_delete=models.CASCADE)
     quantity = models.IntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
+    applied_coupon = models.ForeignKey(Coupon, null=True, blank=True, on_delete=models.SET_NULL)
+
 
     def __str__(self):
         return f"{self.user.username} - {self.menu_item.name}"

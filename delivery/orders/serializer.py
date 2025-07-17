@@ -1,20 +1,35 @@
+from decimal import Decimal
 from rest_framework import serializers
+
+from coupons.models import CouponUsage
 from .models import orders, Cart, OrderItem
 from restaurants.serializer import MenuItemSerializer
-
+from django.utils import timezone
 
 
 
 class CartSerializer(serializers.ModelSerializer):
     menu_item = MenuItemSerializer(read_only=True)
     total_price = serializers.SerializerMethodField()
+    discounted_total = serializers.SerializerMethodField()
 
     class Meta:
         model = Cart
-        fields = ['id', 'menu_item', 'quantity', 'total_price']
+        fields = ['id', 'menu_item', 'quantity', 'total_price', 'discounted_total']
 
     def get_total_price(self, obj):
         return obj.menu_item.price * obj.quantity
+
+    def get_discounted_total(self, obj):
+        total = self.get_total_price(obj)
+        coupon = obj.applied_coupon
+
+        if coupon  and coupon.start_time <= timezone.now() <= coupon.end_time:
+            discount = (Decimal(coupon.discount_percent) / Decimal(100)) * total
+            return (total - discount).quantize(Decimal('0.01'))
+
+        return total
+
 
 
 class CartCreateSerializer(serializers.ModelSerializer):

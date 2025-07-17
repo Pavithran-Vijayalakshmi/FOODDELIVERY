@@ -228,12 +228,27 @@ class OfferCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        # Ensure user is a restaurant owner
+        
         if request.user.user_type != 'RestaurantOwner':
             return Response({"error": "Only restaurant owners can create offers."}, status=status.HTTP_403_FORBIDDEN)
 
-        serializer = OfferSerializer(data=request.data)
+        serializer = OfferSerializer(data=request.data )
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    
+    
+    
+class UserRestaurantsListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        if user.user_type != 'RestaurantOwner':
+            return Response({"error": "Only Restaurant Owners have registered restaurants."}, status=403)
+
+        user_restaurants = restaurants.objects.filter(owner=user)
+        serializer = RestaurantDetailSerializer(user_restaurants, many=True)
+        return Response(serializer.data)
