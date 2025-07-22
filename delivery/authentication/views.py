@@ -12,24 +12,22 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
+    
+
 class RegisterView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
-            user = serializer.save()
-            refresh = RefreshToken.for_user(user)
-
+            serializer.save()
             return Response({
-                "message": "User registered successfully",
-                "refresh": str(refresh),
-                "access": str(refresh.access_token)
+                "message": "User registered successfully. Please log in to access your account."
             }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class LoginView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def post(self, request):
         username = request.data.get("username")
@@ -38,16 +36,18 @@ class LoginView(APIView):
         if user is not None:
             refresh = RefreshToken.for_user(user)
             return Response({
+                "message":str("Login Successful"),
                 "refresh": str(refresh),
                 "access": str(refresh.access_token),
-                "user": UserSerializer(user).data
             })
         return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 
 class LogoutView(APIView):
+    permission_classes = [AllowAny]
     def post(self, request):
         try:
-            refresh_token = request.data["refresh"]
+            refresh_token = request.query_params.get("refresh")
+            
             token = RefreshToken(refresh_token)
             token.blacklist()
             return Response({"message": "Logged out successfully"}, status=status.HTTP_205_RESET_CONTENT)

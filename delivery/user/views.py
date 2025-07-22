@@ -10,6 +10,7 @@ from restaurants.models import restaurants, MenuItem
 class UserListView(APIView):
     
     def get_queryset(self):
+        
         return user.objects.all()
     
     def get(self, request):

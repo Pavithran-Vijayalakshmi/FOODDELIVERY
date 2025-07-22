@@ -267,7 +267,7 @@ class CancelOrderView(APIView):
                 cart_item.save()
 
         # Cancel the order
-        order.status = 'cancelled'
-        order.save()
+        # order.status = 'cancelled'
+        order.cancel()
 
         return Response({"message": "Order cancelled and items added back to cart."}, status=status.HTTP_200_OK)

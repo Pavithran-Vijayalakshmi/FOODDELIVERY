@@ -9,6 +9,8 @@ from .serializer import (RestaurantListSerializer, RestaurantDetailSerializer,
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import IsAuthenticatedOrReadOnly,AllowAny,IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
+from orders.models import orders
+from orders.serializer import OrderSerializer
 
 # Checked
 
@@ -252,3 +254,20 @@ class UserRestaurantsListView(APIView):
         user_restaurants = restaurants.objects.filter(owner=user)
         serializer = RestaurantDetailSerializer(user_restaurants, many=True)
         return Response(serializer.data)
+    
+class MarkOrderReadyView(APIView):
+    permission_classes = [IsAuthenticated]
+    def patch(self, request):
+        order_id = request.query_params.get('order_id')
+        if not order_id:
+            return Response({"error": "Missing 'order_id'"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            order = orders.objects.get(pk=order_id)
+        except orders.DoesNotExist:
+            return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        order.status = 'confirmed'
+        order.save()  #Automatically update status
+
+        return Response({"message": "Order marked ready and status set to 'confirmed'"}, status=status.HTTP_200_OK)

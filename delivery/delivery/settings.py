@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
     'user',
     'restaurants',
     'orders',
@@ -50,6 +51,7 @@ INSTALLED_APPS = [
     'authentication',
     'ratings',
     'coupons',
+    'delivery_partners',
 ]
 
 MIDDLEWARE = [
@@ -183,4 +185,6 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=2),
     "AUTH_HEADER_TYPES": ("Bearer",),
+    'BLACKLIST_AFTER_ROTATION': True,
+    'ROTATE_REFRESH_TOKENS': True,
 }

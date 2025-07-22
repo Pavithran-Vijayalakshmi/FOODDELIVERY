@@ -41,6 +41,7 @@ class user(AbstractUser):
     ('Customer', 'Customer'),
     ('RestaurantOwner', 'RestaurantOwner'),
     ('admin', 'Admin'),
+    ('deliverypartner','DeliveryPartner'),
 )
     user_type = models.CharField(max_length=20, choices=USER_TYPE_CHOICES, default='Customer')
     created_at = models.DateTimeField(auto_now_add=True)
