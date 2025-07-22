@@ -2,7 +2,7 @@ from django.db import models
 from user.models import user
 from restaurants.models import restaurants, MenuItem
 from coupons.models import Coupon
-from delivery_partners.models import Delivery_Partners
+from delivery_partners.models import Delivery_Partners, DeliveryPerson
 import uuid
 
 class Cart(models.Model):
@@ -39,6 +39,7 @@ class orders(models.Model):
     picked_by_partner = models.BooleanField(default=False)
     delivered_to_user = models.BooleanField(default=False)
     cancelled_reason = models.TextField(null=True, blank=True)
+
     
     def cancel(self):
         self.status = 'cancelled'

@@ -42,6 +42,7 @@ class user(AbstractUser):
     ('RestaurantOwner', 'RestaurantOwner'),
     ('admin', 'Admin'),
     ('deliverypartner','DeliveryPartner'),
+    ('deliveryperson','DeliveryPerson'),
 )
     user_type = models.CharField(max_length=20, choices=USER_TYPE_CHOICES, default='Customer')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -51,8 +52,6 @@ class user(AbstractUser):
 
     def __str__(self):
         return self.username
-    
-    
     pass
     
     

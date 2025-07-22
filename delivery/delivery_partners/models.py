@@ -1,10 +1,19 @@
+import re
 from django.db import models
+from delivery import settings
 from restaurants.models import restaurants
-from user.models import user
+from django.contrib.auth import get_user_model
 import uuid
 from django.core.validators import RegexValidator
+from django.core.exceptions import ValidationError
+from django.utils.translation import gettext_lazy as _
+
+User = get_user_model()
+
+
 
 class Delivery_Partners(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='delivery_partner_profile', null = True)
     partner_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100)
     email = models.EmailField(unique=True)
@@ -12,7 +21,7 @@ class Delivery_Partners(models.Model):
         max_length=15,
         validators=[RegexValidator(regex=r'^\+?\d{10,15}$', message="Enter a valid phone number")]
     )
-    vehicle_number = models.CharField(max_length=20)
+    
     is_available = models.BooleanField(default=True, null=False)
     created_at = models.DateTimeField(auto_now_add=True)
     
@@ -27,4 +36,38 @@ class Delivery_Partners(models.Model):
     
     def has_capacity(self):
         return self.active_orders_count() < self.max_orders
+
+
+class DeliveryStatus(models.TextChoices):
+    IDLE = 'idle', _('Idle')
+    PICKED_UP = 'picked_up', _('Picked Up')
+    EN_ROUTE = 'en_route', _('En Route')
+    DELIVERED = 'delivered', _('Delivered')
+    RETURNED = 'returned', _('Returned')
+
+class DeliveryPerson(models.Model):
+    person_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    partner = models.ForeignKey(Delivery_Partners, on_delete=models.CASCADE, related_name='delivery_persons')
+    is_available = models.BooleanField(default=True)
+    assigned_order = models.OneToOneField('orders.orders', on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_person')
+
+    def validate_vehicle_number(value):
+        pattern = r'^[A-Z]{2}\d{2}[A-Z]{1,2}\d{4}$'
+        if not re.match(pattern, value.upper().replace(' ', '')):
+            raise ValidationError('Enter a valid vehicle number (e.g., TN01AB1234)')
+
+    vehicle_number = models.CharField(
+        max_length=20,
+        unique=True,
+        validators=[validate_vehicle_number]
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=DeliveryStatus.choices,
+        default=DeliveryStatus.IDLE
+    )
+
+    def __str__(self):
+        return self.user.username
 
