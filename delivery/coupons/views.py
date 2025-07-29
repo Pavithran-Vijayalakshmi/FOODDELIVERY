@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from .serializer import CouponApplySerializer, CouponSerializer
 from .models import Coupon, CouponUsage
-from orders.models import orders,Cart
+from orders.models import Orders,Cart
 from django.utils import timezone
 from rest_framework import status
 

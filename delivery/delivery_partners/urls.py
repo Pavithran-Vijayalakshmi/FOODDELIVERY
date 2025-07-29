@@ -2,7 +2,8 @@ from django.urls import path
 from .views import (DeliveryPartnerCreateView,UpdateOrderStatusByPartnerView,
                     DeliveryPartnerListView,DeliveryPartnerDeleteView,
                     DeliveryPersonCreateView,AssignOrderToDeliveryPersonView,
-                    DeliveryPersonListView,UpdateDeliveryPersonStatusView)
+                    DeliveryPersonListView,UpdateDeliveryPersonStatusView,
+                    DeliveryPartnerOrderListView)
 
 app_name = "deliverypartners"
 
@@ -11,6 +12,7 @@ urlpatterns = [
     path('deletepartner/',DeliveryPartnerDeleteView.as_view(),name='delete-delivery-partner'),
     path('updateorderstatus/',UpdateOrderStatusByPartnerView.as_view(),name='update-order-status'),
     path('listdeliverypartner/',DeliveryPartnerListView.as_view(),name = 'list'),
+    path('orderlist/',DeliveryPartnerOrderListView.as_view(),name='confirmed-order-list'),
     
     path('deliveryperson/',DeliveryPersonCreateView.as_view(),name='create-delivery-person'),
     path('listdeliveryperson/',DeliveryPersonListView.as_view(),name = 'list'),

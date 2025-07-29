@@ -11,6 +11,7 @@ from .views import (
     OfferCreateView,
     UserRestaurantsListView,
     MarkOrderReadyView,
+    RestaurantOrderListView
     
 )
 
@@ -27,6 +28,7 @@ urlpatterns = [
     path('menu/delete/', MenuItemDeleteView.as_view(), name='menu-item-delete'),
     path('offers/create/', OfferCreateView.as_view(), name='create-offer'),
     path('registered/restaurants/',UserRestaurantsListView.as_view(), name='registered-restaurants' ),
+    path('orders/',RestaurantOrderListView.as_view(), name='restaurant-orders'),
     path('orderstatusupdate/',MarkOrderReadyView.as_view(),name='order-status-update'),
     
 ]

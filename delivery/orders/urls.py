@@ -1,11 +1,11 @@
 from django.urls import path
 from .views import (
     CartListView,
-    OrderListView, OrderDetailView,
-    OrderItemListCreateView, OrderItemDetailView,
+    OrderListView,
     CartItemDeleteView, CartItemUpdateView,
     CartCreateView,CancelOrderView,
-    OrderCreateView
+    OrderCreateView,
+    DeleteFinalizedOrdersByOrderCodeView
 )
 
 app_name = "orders"
@@ -17,6 +17,7 @@ urlpatterns = [
     path('cart/item/delete/', CartItemDeleteView.as_view(), name='cart-item-delete'),
     
     path('orderlist/', OrderListView.as_view(), name='order-list'),
+    path('deleteorders/',DeleteFinalizedOrdersByOrderCodeView.as_view(),name = 'delete-old-orders'),
     path('create/', OrderCreateView.as_view(), name='create-order'),
     path('cancel/', CancelOrderView.as_view(), name='cancel-order'),
 ]

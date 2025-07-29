@@ -2,7 +2,7 @@
 from datetime import timedelta
 from django.db import models
 from django.conf import settings
-from restaurants.models import restaurants, MenuItem
+from restaurants.models import Restaurant, MenuItem
 from django.utils import timezone
 
 
@@ -13,7 +13,7 @@ class Coupon(models.Model):
     start_time = models.DateTimeField(default=timezone.now)
     end_time = models.DateTimeField(default=timezone.now() + timedelta(days=1))
     is_active = models.BooleanField(default=True)
-    restaurant = models.ForeignKey(restaurants, on_delete=models.CASCADE, null=True, blank=True)
+    restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE, null=True, blank=True)
     menu_item = models.ForeignKey(MenuItem, on_delete=models.CASCADE, null=True, blank=True)
 
     def __str__(self):

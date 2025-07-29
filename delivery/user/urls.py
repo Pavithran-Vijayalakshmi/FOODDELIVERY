@@ -1,8 +1,9 @@
 from django.urls import path
-from .views import (UserListView, UserDetailView, UserCreateView,
+from .views import (UserListView,  UserCreateView,
                     MeView,
                     FavoriteCreateView,FavoriteUpdateView,FavoriteDeleteView,
-                    SavedAddressListCreateView, SavedAddressUpdateDeleteView)
+                    SavedAddressListCreateView, SavedAddressUpdateDeleteView,
+                    UpdateUserProfileView)
 
 from restaurants.views import RestaurantMenuView, UserRestaurantsListView
 from coupons.views import ApplyCouponView, CreateCouponView, RemoveCouponView
@@ -12,8 +13,8 @@ app_name = "user"
 urlpatterns = [
     path('', UserListView.as_view(), name='user-list'),
     path('create/',UserCreateView.as_view(),name= 'user-create'),
-    path('<uuid:pk>/', UserDetailView.as_view(), name='user-detail'),
     path('me/', MeView.as_view(), name='user-me'), 
+    path('profile/update/', UpdateUserProfileView.as_view(), name='update-user-profile'),
     path('restaurant/menu/', RestaurantMenuView.as_view(), name='restaurant-menu'),
     path('favorites/create/',FavoriteCreateView.as_view(), name='create-favorite'),
     path('favorites/update/',FavoriteUpdateView.as_view(), name='create-favorite'),

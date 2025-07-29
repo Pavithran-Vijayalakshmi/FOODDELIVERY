@@ -52,6 +52,8 @@ INSTALLED_APPS = [
     'ratings',
     'coupons',
     'delivery_partners',
+    'common',
+    
 ]
 
 MIDDLEWARE = [
@@ -178,7 +180,7 @@ REST_FRAMEWORK = {
 LOGIN_REDIRECT_URL = 'authentication:login'
 LOGIN_REDIRECT_URL = reverse_lazy('restaurants:List Of Restaurants')
 
-AUTH_USER_MODEL = 'user.user'
+AUTH_USER_MODEL = 'user.User'
 
 
 SIMPLE_JWT = {
@@ -188,3 +190,26 @@ SIMPLE_JWT = {
     'BLACKLIST_AFTER_ROTATION': True,
     'ROTATE_REFRESH_TOKENS': True,
 }
+
+
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        'OPTIONS': {'min_length': 8}
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+    },
+]
+
+
+RAZORPAY_KEY_ID = os.getenv('RAZORPAY_KEY_ID')
+RAZORPAY_KEY_SECRET = os.getenv('RAZORPAY_KEY_SECRET')
+# RAZORPAY_WEBHOOK_SECRET = os.getenv('RAZORPAY_WEBHOOK_SECRET')
+# RAZORPAY_WEBHOOK_URL = os.getenv('RAZORPAY_WEBHOOK_URL', 'https://yourdomain.com/webhooks/razorpay/')

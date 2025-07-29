@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
-from .models import rating
+from .models import Rating
 from .serializer import RatingSerializer
 
 class RatingCreateView(APIView):
@@ -11,12 +11,11 @@ class RatingCreateView(APIView):
     def post(self, request):
         user = request.user
 
-        if user.user_type != 'Customer':
+        if user.user_type != 'customer':
             return Response({"error": "Only customers can rate items."}, status=status.HTTP_403_FORBIDDEN)
 
         data = request.data.copy()
 
-        # You should NOT add 'user' to data — pass it manually to serializer.save()
         serializer = RatingSerializer(data=data)
 
         if serializer.is_valid():
@@ -24,7 +23,7 @@ class RatingCreateView(APIView):
             menu_item_id = data.get('menu_item')
 
             # Prevent multiple ratings for the same restaurant or menu item
-            existing_rating = rating.objects.filter(
+            existing_rating = Rating.objects.filter(
                 user=user,
                 restaurant_id=restaurant_id if restaurant_id else None,
                 menu_item_id=menu_item_id if menu_item_id else None
@@ -43,22 +42,15 @@ class RatingCreateView(APIView):
 class RatingUpdateDeleteView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get_object(self, pk, user):
-        try:
-            return rating.objects.get(pk=pk, user=user)
-        except rating.DoesNotExist:
-            return None
-
     def patch(self, request):
-        pk = request.query_params.get('pk')
-        if not pk:
-            return Response({'error': 'Rating ID (pk) is required'}, status=status.HTTP_400_BAD_REQUEST)
+        user = request.user
+        rating = Rating.objects.get(user = user)
 
-        rating_instance = self.get_object(pk, request.user)
-        if not rating_instance:
-            return Response({'error': 'Rating not found or not owned by user'}, status=status.HTTP_404_NOT_FOUND)
+    
+        if not rating:
+            return Response({'error': 'Rating not found for this user'}, status=status.HTTP_404_NOT_FOUND)
 
-        serializer = RatingSerializer(rating_instance, data=request.data, partial=True)
+        serializer = RatingSerializer(rating, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response({'message': 'Rating updated', 'data': serializer.data})

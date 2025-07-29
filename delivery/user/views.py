@@ -1,17 +1,18 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .models import user, favorite, SavedAddress
-from .serializer import UserSerializer,UserCreateSerializer, FavoriteSerializer,SavedAddressSerializer
+from .models import User, Favorite, SavedAddress
+from .serializer import UserSerializer,UserCreateSerializer, FavoriteSerializer,SavedAddressSerializer, UserProfileUpdateSerializer
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
-from restaurants.models import restaurants, MenuItem
+from restaurants.models import Restaurant, MenuItem
+from rest_framework.parsers import MultiPartParser, FormParser
 
 class UserListView(APIView):
     
     def get_queryset(self):
         
-        return user.objects.all()
+        return User.objects.all()
     
     def get(self, request):
         users = self.get_queryset()
@@ -27,24 +28,21 @@ class UserCreateView(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-class UserDetailView(APIView):
-    def get(self, request, pk):
-        user = get_object_or_404(user, pk=pk)
-        serializer = UserSerializer(user)
-        return Response(serializer.data)
-
-    def put(self, request, pk):
-        user = get_object_or_404(user, pk=pk)
-        serializer = UserSerializer(user, data=request.data)
+class UpdateUserProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+    
+    def patch(self, request):
+        user = request.user
+        serializer = UserProfileUpdateSerializer(user, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data)
+                
+            return Response({
+                "message": "Profile updated successfully.",
+                "data": serializer.data
+            })
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def delete(self, request, pk):
-        User = get_object_or_404(user, pk=pk)
-        User.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
     
     
 class MeView(APIView):
@@ -53,7 +51,7 @@ class MeView(APIView):
     def get(self, request):
         user = request.user
 
-        if user.user_type != 'Customer':
+        if user.user_type != 'customer':
             return Response({"error": "Only customers can access this information."}, status=status.HTTP_403_FORBIDDEN)
 
         serializer = UserSerializer(user)
@@ -68,7 +66,7 @@ class FavoriteCreateView(APIView):
     def post(self, request):
         user = request.user
 
-        if user.user_type != 'Customer':
+        if user.user_type != 'customer':
             return Response({"error": "Only customers can create favorites."}, status=403)
 
         restaurant_id = request.data.get('restaurant_id')   
@@ -80,16 +78,16 @@ class FavoriteCreateView(APIView):
             return Response({"error": "You must provide either restaurant or menu_item as a query parameter."}, status=400)
 
         if restaurant_id:
-            restaurant = get_object_or_404(restaurants, id=restaurant_id)
-            if favorite.objects.filter(user=user, restaurant=restaurant).exists():
+            restaurant = get_object_or_404(Restaurant, id=restaurant_id)
+            if Favorite.objects.filter(user=user, restaurant=restaurant).exists():
                 return Response({"error": "Restaurant already in favorites."}, status=400)
-            favorite_obj = favorite.objects.create(user=user, restaurant=restaurant)
+            favorite_obj = Favorite.objects.create(user=user, restaurant=restaurant)
 
         else:
             menu_item = get_object_or_404(MenuItem, id=menu_item_id)
-            if favorite.objects.filter(user=user, menu_item=menu_item).exists():
+            if Favorite.objects.filter(user=user, menu_item=menu_item).exists():
                 return Response({"error": "Menu item already in favorites."}, status=400)
-            favorite_obj = favorite.objects.create(user=user, menu_item=menu_item)
+            favorite_obj = Favorite.objects.create(user=user, menu_item=menu_item)
 
         serializer = FavoriteSerializer(favorite_obj)
         return Response(serializer.data, status=201)
@@ -100,7 +98,7 @@ class FavoriteUpdateView(APIView):
     def patch(self, request):
         user = request.user
 
-        if user.user_type != 'Customer':
+        if user.user_type != 'customer':
             return Response({"error": "Only customers can update favorites."}, status=403)
 
         restaurant_id = request.query_params.get('restaurant')
@@ -114,10 +112,10 @@ class FavoriteUpdateView(APIView):
 
         try:
             if restaurant_id:
-                favorites = favorite.objects.get(user=user, restaurant_id=restaurant_id)
+                favorites = Favorite.objects.get(user=user, restaurant_id=restaurant_id)
             else:
-                favorites= favorite.objects.get(user=user, menu_item_id=menu_item_id)
-        except favorite.DoesNotExist:
+                favorites= Favorite.objects.get(user=user, menu_item_id=menu_item_id)
+        except Favorite.DoesNotExist:
             return Response({"error": "Favorite not found."}, status=404)
 
         # Partial update using PATCH
@@ -128,7 +126,7 @@ class FavoriteUpdateView(APIView):
             updated_menu_item = serializer.validated_data.get('menu_item')
 
             if updated_restaurant and updated_menu_item:
-                return Response({"error": "You can only favorite either a restaurant or menu item, not both."}, status=400)
+                return Response({"error": "You can only Favorite either a restaurant or menu item, not both."}, status=400)
             if not updated_restaurant and not updated_menu_item:
                 return Response({"error": "At least one of restaurant or menu_item must be provided."}, status=400)
 
@@ -144,7 +142,7 @@ class FavoriteDeleteView(APIView):
 
     def delete(self, request):
         user = request.user
-        if user.user_type != 'Customer':
+        if user.user_type != 'customer':
             return Response({"error": "Only customers can delete favorites."}, status=403)
 
         restaurant_id = request.query_params.get('restaurant')
@@ -157,10 +155,10 @@ class FavoriteDeleteView(APIView):
 
         try:
             if restaurant_id:
-                favorites = favorite.objects.get(user=user, restaurant_id=restaurant_id)
+                favorites = Favorite.objects.get(user=user, restaurant_id=restaurant_id)
             else:
-                favorites = favorite.objects.get(user=user, menu_item_id=menu_item_id)
-        except favorite.DoesNotExist:
+                favorites = Favorite.objects.get(user=user, menu_item_id=menu_item_id)
+        except Favorite.DoesNotExist:
             return Response({"error": "Favorite not found."}, status=404)
 
         favorites.delete()
@@ -172,7 +170,7 @@ class SavedAddressListCreateView(APIView):
 
     def get(self, request):
         user = request.user
-        if user.user_type != 'Customer':
+        if user.user_type != 'customer':
             return Response({'error': 'Only customers can view saved addresses.'}, status=403)
 
         addresses = SavedAddress.objects.filter(user=user)
@@ -181,7 +179,7 @@ class SavedAddressListCreateView(APIView):
 
     def post(self, request):
         user = request.user
-        if user.user_type != 'Customer':
+        if user.user_type != 'customer':
             return Response({'error': 'Only customers can add saved addresses.'}, status=403)
 
         serializer = SavedAddressSerializer(data=request.data)
@@ -192,13 +190,12 @@ class SavedAddressListCreateView(APIView):
             return Response(serializer.data, status=201)
         return Response(serializer.errors, status=400)
     
-    
 class SavedAddressUpdateDeleteView(APIView):
     permission_classes = [IsAuthenticated]
 
     def patch(self, request):
         user = request.user
-        if user.user_type != 'Customer':
+        if user.user_type != 'customer':
             return Response({'error': 'Only customers can update addresses.'}, status=403)
 
         address_id = request.query_params.get('address_id')
@@ -220,7 +217,7 @@ class SavedAddressUpdateDeleteView(APIView):
 
     def delete(self, request):
         user = request.user
-        if user.user_type != 'Customer':
+        if user.user_type != 'customer':
             return Response({'error': 'Only customers can delete addresses.'}, status=403)
 
         address_id = request.query_params.get('address_id')
