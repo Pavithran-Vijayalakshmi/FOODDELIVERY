@@ -43,7 +43,6 @@ class DeliveryPerson(models.Model):
     person_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     partner = models.ForeignKey(Delivery_Partners, on_delete=models.CASCADE, related_name='delivery_persons')
     is_available = models.BooleanField(default=True)
-    assigned_order = models.OneToOneField('orders.orders', on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_person')
 
     def validate_vehicle_number(value):
         pattern = r'^[A-Z]{2}\d{2}[A-Z]{1,2}\d{4}$'
@@ -63,4 +62,4 @@ class DeliveryPerson(models.Model):
     )
 
     def __str__(self):
-        return self.user.username
+        return self.user.email

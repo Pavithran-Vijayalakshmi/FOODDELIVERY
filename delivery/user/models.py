@@ -1,6 +1,6 @@
 import uuid
 from django.db import models
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, BaseUserManager
 from phonenumber_field.modelfields import PhoneNumberField
 from restaurants.models import Restaurant,MenuItem
 from django.core.exceptions import ValidationError
@@ -10,17 +10,46 @@ from common.base import AuditMixin, AddressMixin, ProfileMixin, BankDetailsMixin
 from common import types
 from datetime import date
 
+class UserManager(BaseUserManager):
+    def create_user(self, email, password=None, phone_number=None, **extra_fields):
+        if not email:
+            raise ValueError('The Email must be set')
+        
+        if email:
+            email = self.normalize_email(email)
+            extra_fields.setdefault('email', email)
+        
+        if phone_number:
+            extra_fields.setdefault('phone_number', phone_number)
+            
+        user = self.model(email=email, **extra_fields)
+        user.set_password(password)
+        user.save()
+        return user
+
+    def create_superuser(self, email, password, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        extra_fields.setdefault('is_active', True)
+
+        if extra_fields.get('is_staff') is not True:
+            raise ValueError('Superuser must have is_staff=True.')
+        if extra_fields.get('is_superuser') is not True:
+            raise ValueError('Superuser must have is_superuser=True.')
+        return self.create_user(email, password, **extra_fields)
+
 class User(AbstractUser, AuditMixin, AddressMixin, ProfileMixin, BankDetailsMixin):
-    
+    email = models.EmailField(unique=True)
+    username = None
     user_type = models.CharField(max_length=20, choices=types.USER_TYPE_CHOICES, default='customer')
     profile_picture = models.ImageField(upload_to='profile_pics/', blank=True, null=True)
-       
-
-    REQUIRED_FIELDS = ['name','email', 'phone', 'user_type']
-    USERNAME_FIELD = 'username'
+    
+    REQUIRED_FIELDS = []
+    USERNAME_FIELD = 'email'
+    objects = UserManager()
 
     def __str__(self):
-        return self.username
+        return self.email
     
     def save(self, *args, **kwargs):
         if self.dob:
@@ -66,11 +95,3 @@ class SavedAddress(AuditMixin, AddressMixin):
 
     def __str__(self):
         return f"{self.label} - {self.user.username}"
-
-
-
-
-
-
-
-    

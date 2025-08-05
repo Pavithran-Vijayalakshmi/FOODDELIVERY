@@ -1,187 +1,5 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <title>Complete Your Payment</title>
-    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-            text-align: center;
-        }
-        .payment-container {
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 20px;
-            margin-top: 30px;
-            background-color: #f9f9f9;
-        }
-        #rzp-button {
-            background-color: #3399CC;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            font-size: 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        #rzp-button:hover {
-            background-color: #2a7ca5;
-        }
-        .loading {
-            display: none;
-            margin: 20px 0;
-        }
-    </style>
-</head>
-<body>
-    <h1>Complete Your Order</h1>
-    <div class="payment-container">
-        <p>Order Total: ₹<span id="order-amount">{{ order.total_amount }}</span></p>
-        <div class="loading" id="loading">
-            <p>Processing payment...</p>
-        </div>
-        <button id="rzp-button">Pay Now</button>
-        <div id="payment-status"></div>
-    </div>
-
-    <script>
-        $(document).ready(function() {
-            // Get the order ID from the URL or template
-            const orderId = "{{ order.id }}";
-            
-            // Initialize Razorpay when button is clicked
-            $('#rzp-button').click(function(e) {
-                e.preventDefault();
-                $('#loading').show();
-                $('#rzp-button').prop('disabled', true);
-                
-                // Fetch payment details from your backend
-                $.ajax({
-                    url: `/api/orders/${orderId}/payment/`,
-                    method: 'GET',
-                    success: function(data) {
-                        $('#loading').hide();
-                        
-                        if (data.payment_context) {
-                            const options = {
-                                key: data.payment_context.key_id,
-                                amount: data.payment_context.amount,
-                                currency: data.payment_context.currency,
-                                name: data.payment_context.name || "Food Delivery",
-                                description: `Payment for Order #${orderId}`,
-                                order_id: data.payment_context.order_id,
-                                image: "https://your-logo-url.com/logo.png",
-                                handler: function(response) {
-                                    // Verify payment on your server
-                                    verifyPayment(
-                                        orderId, 
-                                        data.payment_id,
-                                        response.razorpay_payment_id,
-                                        response.razorpay_order_id,
-                                        response.razorpay_signature
-                                    );
-                                },
-                                prefill: {
-                                    name: data.payment_context.prefill.name || "{{ request.user.get_full_name }}",
-                                    email: data.payment_context.prefill.email || "{{ request.user.email }}",
-                                    contact: data.payment_context.prefill.contact || ""
-                                },
-                                theme: {
-                                    color: "#3399CC"
-                                },
-                                modal: {
-                                    ondismiss: function() {
-                                        $('#rzp-button').prop('disabled', false);
-                                    }
-                                }
-                            };
-                            
-                            const rzp = new Razorpay(options);
-                            rzp.open();
-                        } else {
-                            $('#payment-status').html('<p>Error: Could not initialize payment</p>');
-                        }
-                    },
-                    error: function() {
-                        $('#loading').hide();
-                        $('#payment-status').html('<p>Error: Could not load payment details</p>');
-                        $('#rzp-button').prop('disabled', false);
-                    }
-                });
-            });
-            
-            function verifyPayment(orderId, paymentId, razorpayPaymentId, razorpayOrderId, signature) {
-                $('#loading').show();
-                $('#payment-status').html('');
-                
-                $.ajax({
-                    url: '/api/payments/verify/',
-                    method: 'POST',
-                    headers: {
-                        'X-CSRFToken': getCookie('csrftoken'),
-                        'Content-Type': 'application/json'
-                    },
-                    data: JSON.stringify({
-                        order_id: orderId,
-                        payment_id: paymentId,
-                        razorpay_payment_id: razorpayPaymentId,
-                        razorpay_order_id: razorpayOrderId,
-                        razorpay_signature: signature
-                    }),
-                    success: function(data) {
-                        $('#loading').hide();
-                        if (data.status === 'success') {
-                            window.location.href = `/order-confirmation/${orderId}/`;
-                        } else {
-                            $('#payment-status').html(`
-                                <p style="color: red;">Payment verification failed</p>
-                                <button onclick="retryPayment('${orderId}')">Try Again</button>
-                            `);
-                        }
-                    },
-                    error: function() {
-                        $('#loading').hide();
-                        $('#payment-status').html(`
-                            <p style="color: red;">Error verifying payment</p>
-                            <button onclick="retryPayment('${orderId}')">Try Again</button>
-                        `);
-                    }
-                });
-            }
-            
-            function retryPayment(orderId) {
-                $('#payment-status').html('');
-                $('#rzp-button').prop('disabled', false);
-            }
-            
-            // Helper function to get CSRF token
-            function getCookie(name) {
-                let cookieValue = null;
-                if (document.cookie && document.cookie !== '') {
-                    const cookies = document.cookie.split(';');
-                    for (let i = 0; i < cookies.length; i++) {
-                        const cookie = cookies[i].trim();
-                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                            break;
-                        }
-                    }
-                }
-                return cookieValue;
-            }
-        });
-    </script>
-</body>
-</html>
-
-
-<!-- <!DOCTYPE html>
-<html>
 
 <head>
     <title>Razorpay Checkout</title>
@@ -192,11 +10,11 @@
     <button id="rzp-button">Pay with Razorpay</button>
     <script>
         var options = {
-            "key": "rzp_test_k9LQntVuh4hAw6", 
+            "key": "rzp_test_ovoRNkH3EPcBU9", 
             "currency": "INR",
             "description": "Test Transaction",
             "image": "https://your-logo-url.com/logo.png",
-            "order_id": "order_QqCumxfKzNyZ7w", // Replace with generated order_id from server
+            "order_id": "order_R1cevD2UmP5rIc", // Replace with generated order_id from server
             "handler": function (response) {
                 alert("Payment successful!");
                 console.log("Order ID:", response.razorpay_order_id);
@@ -204,13 +22,13 @@
                 console.log("Payment ID:", response.razorpay_payment_id);
             },
             "prefill": {
-                "name": "Sivaraj",
-                "email": "siva112@gmail.com",
+                "name": "Pavithran",
+                "email": "pavithran@gmail.com",
                 "contact": "1234512345"
             },
             "notes": {
-                "note_key_1": "September",
-                "note_key_2": "Make it so."
+                "note_key_1": "August",
+                "note_key_2": "Month"
             },
             "theme": {
                 "color": "#3399CC"
@@ -224,4 +42,4 @@
     </script>
 </body>
 
-</html> -->
+</html>

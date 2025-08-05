@@ -4,13 +4,34 @@ from rest_framework import serializers
 from ratings.models import Rating
 from .models import Restaurant, MenuItem, Offer, Category
 from django.db.models import Avg
+from common.models import Country,City, State
+
+
+
 
 class RestaurantListSerializer(serializers.ModelSerializer):
+    country_name = serializers.SerializerMethodField()
+    state_name = serializers.SerializerMethodField()
+    city_name = serializers.SerializerMethodField()
     average_rating = serializers.SerializerMethodField()
+
     class Meta:
         model = Restaurant
-        fields = ['id', 'name', 'description', 'average_rating']  
+        fields = [
+            'id', 'name', 'description', 
+            'average_rating', 'country_name', 
+            'state_name', 'city_name', 'is_approved'
+        ]
 
+    def get_country_name(self, obj):
+        return obj.city.state.country.name if obj.city and obj.city.state else None
+
+    def get_state_name(self, obj):
+        return obj.city.state.name if obj.city and obj.city.state else None
+
+    def get_city_name(self, obj):
+        return obj.city.name if obj.city else None
+    
     def get_average_rating(self, obj):
         # if rating.objects.filter(restaurant=obj) is not None:
             avg_rating = Rating.objects.filter(restaurant=obj).aggregate(avg=Avg('rating'))['avg']
@@ -19,6 +40,9 @@ class RestaurantListSerializer(serializers.ModelSerializer):
             return None
 
 class RestaurantDetailSerializer(serializers.ModelSerializer):
+    country_name = serializers.SerializerMethodField()
+    state_name = serializers.SerializerMethodField()
+    city_name = serializers.SerializerMethodField()
     average_rating = serializers.SerializerMethodField()
     total_ratings = serializers.SerializerMethodField()
     menu_items = serializers.SerializerMethodField()
@@ -26,9 +50,10 @@ class RestaurantDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Restaurant
-        fields = ['id', 'name', 'description', 'city', 'restaurant_primary_phone', 'email',
+        fields = ['id', 'name', 'description', 'country_name', 'state_name', 'city_name',
+                  'restaurant_primary_phone', 'email',
                   'opening_time', 'closing_time', 'is_open', 'created_at',
-                  'average_rating', 'total_ratings', 'menu_items', 'offers']
+                  'average_rating', 'total_ratings', 'menu_items', 'offers','is_approved']
 
     def get_average_rating(self, obj):
         if Rating.objects.filter(restaurant=obj) is not None:
@@ -49,17 +74,35 @@ class RestaurantDetailSerializer(serializers.ModelSerializer):
         offers = Offer.objects.filter(restaurant=obj, start_date__lte=current_time, end_date__gte=current_time)
         return OfferSerializer(offers, many=True).data
     
+    def get_country_name(self, obj):
+        return obj.city.state.country.name if obj.city and obj.city.state else None
+
+    def get_state_name(self, obj):
+        return obj.city.state.name if obj.city and obj.city.state else None
+
+    def get_city_name(self, obj):
+        return obj.city.name if obj.city else None
     
 class RestaurantCreateSerializer(serializers.ModelSerializer):
-    # password = serializers.CharField(write_only = True)
+    country_name = serializers.CharField(source='country.name', read_only=True)
+    state_name = serializers.CharField(source='state.name', read_only=True)
+    city_name = serializers.CharField(source='city.name', read_only=True)
     class Meta:
         model = Restaurant
-        fields = ['id',
-            'name','city','description','restaurant_primary_phone','email','opening_time','closing_time','is_open',
+        fields = [
+            'id', 'name', 'city', 'country_name', 'state_name', 'city_name', 'description', 'restaurant_primary_phone', 'email',
+            'opening_time', 'closing_time', 'is_open','restaurant_type'
         ]
+        read_only_fields = ['is_approved'] 
 
     def create(self, validated_data):
-        return Restaurant.objects.create(**validated_data)
+        # Create restaurant but mark as unapproved by default
+        restaurant = Restaurant.objects.create(
+            **validated_data,
+            owner=self.context['request'].user,
+            is_approved=False
+        )
+        return restaurant
     
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -73,13 +116,12 @@ class MenuItemSerializer(serializers.ModelSerializer):
     total_ratings = serializers.SerializerMethodField()
     discounted_price = serializers.SerializerMethodField()
     review = serializers.SerializerMethodField()
-    # category = CategorySerializer(read_only=True)
     
     class Meta:
         model = MenuItem
-        fields = ['id', 'name', 'description', 'price',
-                   'restaurant','is_available', 'created_at',
-                  'average_rating','review', 'total_ratings','discounted_price']
+        fields = ['id', 'name', 'price',
+                'restaurant','is_available', 'created_at','image',
+                'average_rating','review', 'total_ratings','discounted_price', 'is_approved']
         
     def get_review(self, obj):
         return [
@@ -145,10 +187,15 @@ class MenuItemUpdateSerializer(serializers.ModelSerializer):
         
         
 class MenuItemCreateSerializer(serializers.ModelSerializer):
+    # image_url = serializers.SerializerMethodField()
+    
     class Meta:
         model = MenuItem
-        fields = ['id', 'name', 'description', 'price', 'category','item_type',
-                'is_available']
+        fields = ['id', 'name', 'price', 'category','item_type', 'restaurant',
+                'is_available', 'image']
+        
+    # def get_image_url(self, obj):
+    #     return obj.image_url
         
         
 class OfferSerializer(serializers.ModelSerializer):

@@ -7,7 +7,7 @@ from common.base import (AuditMixin, AddressMixin,
                          MediaMixin, PriceMixin, 
                          StatusMixin, TimeRangeMixin,
                          ComplianceAndBankDetailsMixin,
-                         RestaurantPaymentInfoMixin, BankDetailsMixin, PaymentMethodMixin)
+                         RestaurantPaymentInfoMixin, BankDetailsMixin, PaymentMethodMixin, ProfileMixin)
 from phonenumber_field.modelfields import PhoneNumberField
 from common.types import RESTAURANT_TYPE_CHOICES, MENU_ITEM_TYPE_CHOICES
 
@@ -31,39 +31,48 @@ class Restaurant(AuditMixin, AddressMixin, StatusMixin,
     closing_time = models.TimeField()
     is_open = models.BooleanField(default=True)
     restaurant_type = models.CharField(max_length=10, choices=RESTAURANT_TYPE_CHOICES, default='both')
+    is_approved = models.BooleanField(default=False)
 
     class Meta:
-        unique_together = ('name', 'city')  
+        unique_together = ('name', 'city')
+        unique_together = ('name', 'email')
+        unique_together = ('name', 'address_line1')
         verbose_name_plural = "Restaurants"
+        permissions = [
+            ("can_approve_restaurant", "Can approve restaurant"),
+        ]
 
     def __str__(self):
         return self.name
 
+class Category(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+    description = models.TextField(blank=True, default='')
+
+    def __str__(self):
+        return self.name
 
 
 class MenuItem(AuditMixin, PriceMixin, MediaMixin):
     restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name='menu_items')
     name = models.CharField(max_length=100)
-    description = models.TextField(null=True)
     is_available = models.BooleanField(default=True)
-    category = models.CharField(max_length=50)
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='menu_item_category')
     item_type = models.CharField(max_length=10, choices=MENU_ITEM_TYPE_CHOICES, default='both')
+    is_approved = models.BooleanField(default=False)
 
     class Meta:
         unique_together = ('restaurant', 'name')
+        permissions = [
+            ("can_approve_item", "Can approve item"),
+        ]
 
     def __str__(self):
         return self.name
 
 
 
-class Category(models.Model):
-    name = models.CharField(max_length=50, unique=True)
-    description = models.TextField(blank=True, default='')
-    is_active = models.BooleanField(default=True)
 
-    def __str__(self):
-        return self.name
 
     
     

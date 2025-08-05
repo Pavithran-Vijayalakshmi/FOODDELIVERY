@@ -3,17 +3,60 @@ from django.conf import settings
 import uuid
 from django.utils import timezone
 from datetime import timedelta
-from phonenumber_field.modelfields import PhoneNumberField
+from .models import Region, City,Country,State
 from .types import GENDER_CHOICES
-from django.db.models.signals import pre_save
-from django.dispatch import receiver
+
 from .types import PAYMENT_METHOD_CHOICES, PAYMENT_STATUS_CHOICES
+from delivery.settings import RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET
 import razorpay
+import os
+from uuid import uuid4
+
+
+
+
+
+class AuditMixinAdmin(models.Model):
+    is_admin = models.BooleanField(default=False)
+    admin_access_level = models.CharField(
+        max_length=20,
+        choices=[
+            ('full', 'Full Access'),
+            ('content', 'Content Management'),
+            ('financial', 'Financial Reports'),
+            ('support', 'Customer Support'),
+        ],
+        null=True,
+        blank=True
+    )
+    admin_notes = models.TextField(blank=True, null=True)
+    
+    @property
+    def is_staff(self):
+        """Override is_staff to include admin users"""
+        return self.is_admin or super().is_staff
+    
+    class Meta:
+        abstract = True
+
+
+
 
 class ProfileMixin(models.Model):
     name = models.CharField(max_length=100)
-    email = models.EmailField(unique=True)
-    phone = PhoneNumberField(unique=True, region='IN')
+    # email = models.EmailField(unique=True)
+    phone_region= models.ForeignKey(
+        Region,
+        on_delete=models.PROTECT,
+        related_name='profiles',
+        null=True,
+    )
+    phone_number = models.CharField(
+        max_length=15,
+        unique=True,
+        null=True,
+        blank=True
+    )
     age = models.IntegerField(null=True)
     dob = models.DateField(null=True, blank=True)
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES, null=True)
@@ -57,13 +100,16 @@ class AuditMixin(models.Model):
     class Meta:
         abstract = True
 
+
+
+
 class AddressMixin(models.Model):
     address_line1 = models.CharField(max_length=150, blank=False, null=True)
     address_line2 = models.CharField(max_length=150, blank=True, null=True)
-    city = models.CharField(max_length=50, blank=False, null=True)
-    state = models.CharField(max_length=50, blank=False,null=True)
+    city = models.ForeignKey(City, on_delete=models.SET_NULL, null=True)
+    state = models.ForeignKey(State, on_delete=models.SET_NULL, null=True)
+    country = models.ForeignKey(Country, on_delete=models.SET_NULL, null=True)
     pincode = models.IntegerField(null=True)
-    country = models.CharField(max_length=50,blank=False, null=True)
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
     label = models.CharField(max_length=50, help_text='e.g., Home, Work',default='Home')
@@ -87,12 +133,87 @@ class TimeRangeMixin(models.Model):
 
     class Meta:
         abstract = True
+        
+        
+def upload_to(instance, filename):
+    # Generate unique filename
+    ext = os.path.splitext(filename)[1]
+    new_filename = f"{uuid4().hex}{ext}"
+    # Return path based on model class name
+    return f"{instance._meta.model_name}/{new_filename}"
 
 class MediaMixin(models.Model):
-    image = models.ImageField(upload_to='media/', blank=True, null=True)
+    image = models.ImageField(upload_to='%Y/%m/%d/', blank=True, null=True)
 
     class Meta:
         abstract = True
+        
+# class MediaMixin(models.Model):
+#     image = models.ImageField(
+#         upload_to=upload_to,
+#         blank=True,
+#         null=True,
+#         max_length=255,  # Recommended for production
+#         help_text="Upload an image file (JPEG, PNG, etc.)"
+#     )
+    
+#     class Meta:
+#         abstract = True
+
+#     @property
+#     def image_url(self):
+#         """Returns full URL if image exists, otherwise None"""
+#         if self.image and hasattr(self.image, 'url'):
+#             return self.image.url
+#         return None
+    
+#     def save(self, *args, **kwargs):
+#         """Process image before saving"""
+#         if self.image:
+#             try:
+#                 # Open the image
+#                 img = Image.open(self.image)
+                
+#                 # Convert to RGB if necessary
+#                 if img.mode != 'RGB':
+#                     img = img.convert('RGB')
+                
+#                 # Optimize image quality and size
+#                 img.thumbnail((1200, 1200))  # Resize while maintaining aspect ratio
+                
+#                 # Save optimized image
+#                 output = BytesIO()
+#                 img.save(output, format='JPEG', quality=85, optimize=True)
+#                 output.seek(0)
+                
+#                 # Generate new filename
+#                 ext = os.path.splitext(self.image.name)[1].lower()
+#                 new_name = f"{uuid4().hex}{ext}"
+                
+#                 # Save to model
+#                 self.image.save(
+#                     new_name,
+#                     ContentFile(output.getvalue()),
+#                     save=False
+#                 )
+#             except Exception as e:
+#                 # Handle image processing errors gracefully
+#                 raise ValidationError(f"Error processing image: {str(e)}")
+        
+#         super().save(*args, **kwargs)
+
+#     def validate_image(image):
+#         """Validate uploaded image"""
+#         # Check file size (2MB max)
+#         max_size = 2 * 1024 * 1024
+#         if image.size > max_size:
+#             raise ValidationError(f"Image too large (Max {max_size/1024/1024}MB allowed)")
+        
+#         # Check file extension
+#         valid_extensions = ['.jpg', '.jpeg', '.png', '.webp']
+#         ext = os.path.splitext(image.name)[1].lower()
+#         if ext not in valid_extensions:
+#             raise ValidationError(f"Unsupported file extension. Allowed: {', '.join(valid_extensions)}")
 
 class PriceMixin(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -228,17 +349,13 @@ class BankDetailsMixin(models.Model):
     
 
 
-import uuid
-from django.db import models
-from django.utils import timezone
+
 
 class PaymentMethodMixin(models.Model):
-    
-    # Core Payment Fields
+    # Core Payment Fields (unchanged)
     payment_method_id = models.UUIDField(
-    default=uuid.uuid4(), 
-    unique=True,
-    editable=False
+        default=uuid.uuid4, 
+        editable=False
     )
     
     payment_method_type = models.CharField(
@@ -247,30 +364,35 @@ class PaymentMethodMixin(models.Model):
         default='cash_on_delivery'
     )
     
-    # Payment State Tracking
     payment_status = models.CharField(
         max_length=20,
         choices=PAYMENT_STATUS_CHOICES,
         default='pending'
     )
-    payment_authorized_at = models.DateTimeField(null=True, blank=True)
-    payment_captured_at = models.DateTimeField(null=True, blank=True)
     
-    # Transaction Identifiers
+    # Razorpay-Specific Fields
+    razorpay_order_id = models.CharField(max_length=100, blank=True, null=True)
+    razorpay_payment_id = models.CharField(max_length=100, blank=True, null=True)
+    
+    # Transaction Identifiers (unchanged)
     gateway_reference_id = models.UUIDField(null=True, blank=True)
     merchant_reference_id = models.UUIDField(default=uuid.uuid4, editable=False)
     gateway_transaction_id = models.CharField(max_length=100, blank=True, null=True)
     
-    # Security Fields
-    is_live_mode = models.BooleanField(default=False)
-    gateway_name = models.CharField(max_length=50, blank=True, null=True)
+    # Timestamps (unchanged)
+    payment_authorized_at = models.DateTimeField(null=True, blank=True)
+    payment_captured_at = models.DateTimeField(null=True, blank=True)
     
-    # Financial Tracking
+    # Financial Tracking (unchanged)
     amount_authorized = models.DecimalField(max_digits=10, decimal_places=2, null=True)
     amount_captured = models.DecimalField(max_digits=10, decimal_places=2, null=True)
     amount_refunded = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     
-    # Audit Trail
+    # Security Fields (unchanged)
+    is_live_mode = models.BooleanField(default=False)
+    gateway_name = models.CharField(max_length=50, blank=True, null=True)
+    
+    # Audit Trail (unchanged)
     payment_attempts = models.PositiveIntegerField(default=0)
     last_error = models.JSONField(null=True, blank=True)
     metadata = models.JSONField(default=dict, blank=True)
@@ -282,67 +404,95 @@ class PaymentMethodMixin(models.Model):
             models.Index(fields=['merchant_reference_id']),
         ]
 
+    # --- Updated Methods Below ---
+
     def initiate_payment(self, amount, currency='INR', **kwargs):
-        """Standardized payment initiation flow"""
+        """Handles Razorpay Order creation or COD authorization."""
         self.amount_authorized = amount
         self.payment_attempts += 1
         self.metadata.update(kwargs)
         
         if self.payment_method_type == 'cash_on_delivery':
-            self.payment_status = 'authorized'
-            self.payment_authorized_at = timezone.now()
-            self.save()
+            self._handle_cod_authorization()
             return True
             
-        # Implement gateway-specific logic:
-        payment_result = self._gateway_specific_charge(amount, currency)
+        elif self.payment_method_type == 'razorpay':
+            return self._handle_razorpay_charge(amount, currency)
         
-        if payment_result['status'] == 'success':
-            self.gateway_transaction_id = payment_result['transaction_id']
-            self.gateway_reference_id = uuid.UUID(payment_result['reference_id'])
-            self.payment_status = 'authorized'
-            self.payment_authorized_at = timezone.now()
-            self.save()
-            return True
-            
-        self._record_failure(payment_result)
         return False
 
-    def capture_payment(self, amount=None):
-        """Capture authorized payment"""
-        if self.payment_status != 'authorized':
+    def _handle_cod_authorization(self):
+        """Mark COD payment as authorized."""
+        self.payment_status = 'authorized'
+        self.payment_authorized_at = timezone.now()
+        self.save()
+
+    def _handle_razorpay_charge(self, amount, currency):
+        """Create Razorpay Order and store IDs."""
+        try:
+            client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+            amount_in_paise = int(amount * 100)
+            
+            razorpay_order = client.order.create({
+                'amount': amount_in_paise,
+                'currency': currency,
+                'payment_capture': 1,  # Auto-capture
+                'notes': {
+                    'merchant_reference_id': str(self.merchant_reference_id),
+                }
+            })
+            
+            # Update fields
+            self.gateway_transaction_id = razorpay_order['id']
+            self.gateway_reference_id = uuid.UUID(razorpay_order['id'])  # Optional
+            self.razorpay_order_id = razorpay_order['id']  # If you added this field
+            self.payment_status = 'authorized'
+            self.payment_authorized_at = timezone.now()
+            self.save()
+            
+            return True
+            
+        except Exception as e:
+            self._record_failure({
+                'code': 'razorpay_error',
+                'message': str(e),
+                'response': getattr(e, 'error', None)
+            })
             return False
-            
-        amount_to_capture = amount or self.amount_authorized
-        capture_result = self._gateway_specific_capture(amount_to_capture)
-        
-        if capture_result['success']:
-            self.amount_captured = amount_to_capture
-            self.payment_status = 'captured'
-            self.payment_captured_at = timezone.now()
-            self.save()
-            return True
-        return False
 
-    def _gateway_specific_charge(self, amount, currency):
-        """Implement actual gateway API call here"""
-        # Example structure for Stripe:
-        return {
-            'status': 'success',
-            'transaction_id': f'ch_{uuid.uuid4().hex}',
-            'reference_id': uuid.uuid4().hex,
-        }
+    def verify_razorpay_payment(self, payment_id):
+        """Verify Razorpay payment via webhook/callback."""
+        try:
+            client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+            payment = client.payment.fetch(payment_id)
+            
+            if payment['status'] == 'captured':
+                self.razorpay_payment_id = payment_id
+                self.gateway_transaction_id = payment_id  # Optional
+                self.payment_status = 'captured'
+                self.payment_captured_at = timezone.now()
+                self.amount_captured = payment['amount'] / 100  # Paise → INR
+                self.save()
+                return True
+                
+        except Exception as e:
+            self._record_failure({
+                'code': 'verification_failed',
+                'message': str(e),
+            })
+        
+        return False
 
     def _record_failure(self, error_details):
+        """Record payment failure (unchanged)."""
         self.last_error = {
             'timestamp': timezone.now().isoformat(),
-            'code': error_details.get('code'),
-            'message': error_details.get('message'),
-            'gateway_response': error_details.get('response'),
+            **error_details,
         }
         self.payment_status = 'failed'
         self.save()
 
+    # --- Helper Properties (unchanged) ---
     @property
     def is_settled(self):
         return self.payment_status in ('captured', 'refunded')
@@ -363,100 +513,50 @@ class PaymentMethodMixin(models.Model):
             }
         }
         
-    def get_razorpay_checkout_context(self):
-        """Generate context needed for Razorpay checkout.js"""
-        if self.payment_method_type != 'razorpay':
-            return None
-            
-        return {
-            'key_id': settings.RAZORPAY_KEY_ID,
-            'amount': int(self.amount_authorized * 100),  # Convert to paise
-            'currency': 'INR',
-            'order_id': self.gateway_transaction_id,
-            'name': settings.COMPANY_NAME,
-            'description': f'Payment for order {self.merchant_reference_id}',
-            'prefill': {
-                'name': self.user.get_full_name(),
-                'email': self.user.email,
-                'contact': getattr(self.user, 'phone_number', '')
-            },
-            'theme': {
-                'color': '#F37254'
-            }
-        }
-
-    def _gateway_specific_charge(self, amount, currency):
-        """Razorpay implementation of payment charge"""
-        if self.payment_method_type != 'razorpay':
-            return super()._gateway_specific_charge(amount, currency)
-            
+        
+    def create_razorpay_order(self, amount):
+        """Creates a Razorpay order and returns payment context"""
         try:
-            client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+            client = razorpay.Client(auth=(RAZORPAY_KEY_ID,RAZORPAY_KEY_SECRET))
+            receipt_id = f"ord_{str(self.id)[:30]}" 
             
-            # Convert amount to paise (Razorpay's requirement)
-            amount_in_paise = int(amount * 100)
+            razorpay_order = client.order.create({
+                'amount': int(amount * 100),  # Amount in paise
+                'currency': 'INR',
+                'payment_capture': 1,  # Auto-capture payment
+                'receipt': receipt_id,
+            })
             
-            # Create Razorpay order
-            order_data = {
-                'amount': amount_in_paise,
-                'currency': currency,
-                'payment_capture': 0,  # Authorize first, capture later
-                'notes': {
-                    'merchant_reference_id': str(self.merchant_reference_id),
-                    'order_id': str(self.id)
-                }
-            }
-            
-            razorpay_order = client.order.create(data=order_data)
+            # Save Razorpay details
+            self.razorpay_order_id = razorpay_order['id']
+            self.payment_status = 'created'
+            self.save()
             
             return {
-                'status': 'success',
-                'transaction_id': razorpay_order['id'],
-                'reference_id': razorpay_order['id'],
-                'gateway_response': razorpay_order,
-                'verification_data': {
-                    'razorpay_order_id': razorpay_order['id'],
-                    'callback_url': settings.RAZORPAY_WEBHOOK_URL
-                }
+                'order_id': razorpay_order['id'],
+                'amount': amount,
+                'currency': 'INR',
+                'key_id': RAZORPAY_KEY_ID
             }
             
         except Exception as e:
-            return {
-                'status': 'failed',
-                'code': 'razorpay_error',
-                'message': str(e),
-                'response': getattr(e, 'error', None)
-            }
+            # Log error
+            from django.core.exceptions import ValidationError
+            raise ValidationError(f"Razorpay order creation failed: {str(e)}")
 
-    def _gateway_specific_capture(self, amount):
-        """Capture Razorpay payment"""
-        if self.payment_method_type != 'razorpay':
-            return super()._gateway_specific_capture(amount)
-            
+    def verify_razorpay_payment(self, payment_id):
+        """Verifies a Razorpay payment"""
         try:
-            client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
-            amount_in_paise = int(amount * 100)
+            client = razorpay.Client(auth=(RAZORPAY_KEY_ID,RAZORPAY_KEY_SECRET))
+            payment = client.payment.fetch(payment_id)
             
-            # First verify the payment is actually authorized
-            payment = client.payment.fetch(self.gateway_transaction_id)
-            if payment['status'] != 'authorized':
-                return {'success': False, 'error': 'Payment not in authorized state'}
-            
-            # Perform capture
-            capture_response = client.payment.capture(
-                self.gateway_transaction_id,
-                amount_in_paise
-            )
-            
-            return {
-                'success': True,
-                'captured_amount': amount,
-                'gateway_response': capture_response
-            }
-            
+            if payment['status'] == 'captured':
+                self.razorpay_payment_id = payment_id
+                self.payment_status = 'captured'
+                self.payment_captured_at = timezone.now()
+                self.save()
+                return True
+            return False
         except Exception as e:
-            return {
-                'success': False,
-                'error': str(e),
-                'gateway_error': getattr(e, 'error', None)
-            }
+            # Log error
+            return False

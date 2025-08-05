@@ -1,0 +1,112 @@
+# myapp/management/commands/populate_categories.py
+from django.core.management.base import BaseCommand
+from restaurants.models import Category
+
+class Command(BaseCommand):
+    help = 'Populates the database with initial categories'
+
+    def handle(self, *args, **options):
+        categories = [
+            {"name": "Afghani", "description": "Authentic Afghan cuisine"},
+            {"name": "American", "description": "Classic American dishes"},
+            {"name": "Andhra", "description": "Spicy Andhra specialties"},
+            {"name": "Arabian", "description": "Middle Eastern flavors"},
+            {"name": "Asian", "description": "Pan-Asian cuisine"},
+            {"name": "Bakery", "description": "Fresh baked goods"},
+            {"name": "Bangladeshi", "description": "Bangladeshi delicacies"},
+            {"name": "Barbecue", "description": "Grilled and smoked meats"},
+            {"name": "Bengali", "description": "Traditional Bengali food"},
+            {"name": "Beverages", "description": "Drinks and refreshments"},
+            {"name": "Bihari", "description": "Bihar region specialties"},
+            {"name": "Biryani", "description": "Fragrant rice dishes"},
+            {"name": "Brownies", "description": "Chocolate desserts"},
+            {"name": "Bubble Tea", "description": "Taiwanese tea drinks"},
+            {"name": "Burger", "description": "Juicy burgers"},
+            {"name": "Burgers", "description": "Various burger options"},
+            {"name": "Burmese", "description": "Myanmar cuisine"},
+            {"name": "Cafe", "description": "Coffee and light meals"},
+            {"name": "Cakes", "description": "Sweet baked treats"},
+            {"name": "Cakes & Pastries", "description": "Dessert selection"},
+            {"name": "Chaat", "description": "Indian street snacks"},
+            {"name": "Chettinad", "description": "Spicy Tamil cuisine"},
+            {"name": "Chinese", "description": "Chinese favorites"},
+            {"name": "Chocolate", "description": "Chocolate-based desserts"},
+            {"name": "Coastal", "description": "Seafood specialties"},
+            {"name": "Coffee", "description": "Coffee beverages"},
+            {"name": "Combo", "description": "Meal combos"},
+            {"name": "Continental", "description": "European-style dishes"},
+            {"name": "Dessert", "description": "Sweet treats"},
+            {"name": "Desserts", "description": "After-meal sweets"},
+            {"name": "European", "description": "Continental cuisine"},
+            {"name": "Fusion", "description": "Creative culinary blends"},
+            {"name": "Fast Food", "description": "Quick service meals"},
+            {"name": "French", "description": "French cuisine"},
+            {"name": "Greek", "description": "Mediterranean flavors"},
+            {"name": "Grill", "description": "Grilled dishes"},
+            {"name": "Haleem", "description": "Slow-cooked wheat dish"},
+            {"name": "Healthy", "description": "Nutritious options"},
+            {"name": "Home Food", "description": "Homestyle cooking"},
+            {"name": "Hyderabadi", "description": "Deccani cuisine"},
+            {"name": "Ice Cream", "description": "Frozen desserts"},
+            {"name": "Indian", "description": "Indian favorites"},
+            {"name": "Italian", "description": "Pasta and pizza"},
+            {"name": "Jain", "description": "Vegetarian Jain food"},
+            {"name": "Japanese", "description": "Sushi and more"},
+            {"name": "Juices", "description": "Fresh fruit juices"},
+            {"name": "Kebabs", "description": "Skewered meats"},
+            {"name": "Kerala", "description": "South Indian cuisine"},
+            {"name": "Keto", "description": "Low-carb options"},
+            {"name": "Korean", "description": "Korean specialties"},
+            {"name": "Lebanese", "description": "Middle Eastern dishes"},
+            {"name": "Lucknowi", "description": "Awadhi cuisine"},
+            {"name": "Maharashtrian", "description": "Maharashtra food"},
+            {"name": "Malaysian", "description": "Malay cuisine"},
+            {"name": "Mangalorean", "description": "Coastal Karnataka food"},
+            {"name": "Mediterranean", "description": "Healthy Mediterranean"},
+            {"name": "Mexican", "description": "Tacos and burritos"},
+            {"name": "Middle Eastern", "description": "Arabic cuisine"},
+            {"name": "Milkshakes", "description": "Creamy beverages"},
+            {"name": "Momos", "description": "Tibetan dumplings"},
+            {"name": "Mughlai", "description": "Rich Mughal dishes"},
+            {"name": "Nepalese", "description": "Himalayan cuisine"},
+            {"name": "North Indian", "description": "Punjabi favorites"},
+            {"name": "Oriental", "description": "East Asian cuisine"},
+            {"name": "Paan", "description": "Betel leaf preparations"},
+            {"name": "Pan-Asian", "description": "Asian fusion"},
+            {"name": "Pasta", "description": "Italian noodles"},
+            {"name": "Pizzas", "description": "Italian pizzas"},
+            {"name": "Punjabi", "description": "North Indian food"},
+            {"name": "Rajasthani", "description": "Rajasthan specialties"},
+            {"name": "Rolls", "description": "Wrapped snacks"},
+            {"name": "Salads", "description": "Healthy greens"},
+            {"name": "Seafood", "description": "Ocean delicacies"},
+            {"name": "Shakes", "description": "Blended beverages"},
+            {"name": "Snacks", "description": "Light bites"},
+            {"name": "South Indian", "description": "Dosa and idli"},
+            {"name": "Street Food", "description": "Local favorites"},
+            {"name": "Sushi", "description": "Japanese delicacy"},
+            {"name": "Sweets", "description": "Indian mithai"},
+            {"name": "Tandoori", "description": "Clay oven dishes"},
+            {"name": "Tea", "description": "Hot beverages"},
+            {"name": "Tex-Mex", "description": "Mexican-American fusion"},
+            {"name": "Thai", "description": "Thai cuisine"},
+            {"name": "Thali", "description": "Complete Indian meal"},
+            {"name": "Tibetan", "description": "Himalayan dishes"},
+            {"name": "Turkish", "description": "Turkish specialties"},
+            {"name": "Waffle", "description": "Breakfast waffles"},
+            {"name": "Shawarma", "description": "Middle Eastern wrap"},
+            {"name": "Sandwich", "description": "Bread-based meals"},
+            {"name": "Paratha", "description": "Indian flatbread"},
+            {"name": "Pure Veg", "description": "Vegetarian-only"}
+        ]
+
+        created_count = 0
+        for category_data in categories:
+            _, created = Category.objects.get_or_create(
+                name=category_data['name'],
+                defaults={'description': category_data['description']}
+            )
+            if created:
+                created_count += 1
+
+        self.stdout.write(self.style.SUCCESS(f'Successfully created {created_count} categories'))

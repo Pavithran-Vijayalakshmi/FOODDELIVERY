@@ -61,13 +61,14 @@ PAYMENT_METHOD_CHOICES = [
         ('netbanking', 'Net Banking'),
         ('wallet', 'Digital Wallet (Paytm, Amazon Pay)'),
         ('cash_on_delivery', 'Cash on Delivery'),
-        ('razor_pay',"Razor Pay"),
+        ('razorpay',"Razor Pay"),
     ]
 
 PAYMENT_STATUS_CHOICES = [
         ('pending', 'Pending Authorization'),
         ('authorized', 'Authorized'),
         ('captured', 'Captured'),
+        ('paid', 'Paid'),
         ('failed', 'Failed'),
         ('refund_initiated', 'Refund Initiated'),
         ('refunded', 'Refunded'),

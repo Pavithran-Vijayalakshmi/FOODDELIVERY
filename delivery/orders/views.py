@@ -1,22 +1,30 @@
-from datetime import timezone
+from django.utils import timezone
 from decimal import Decimal
+import hashlib
+import hmac
 import json
 from uuid import UUID
 import razorpay
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-
-from delivery import settings
+from common.response import api_response
+from delivery.settings import RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_URL, RAZORPAY_WEBHOOK_SECRET
 from .models import Cart, Orders, OrderItem
 from .serializer import CartCreateSerializer, CartItemUpdateSerializer, CartSerializer, OrderSerializer, OrderItemSerializer
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, redirect, render
 from rest_framework.permissions import IsAuthenticated
 from user.models import SavedAddress
 from django.db.models import Max, Q
 from collections import defaultdict
 from django.db import transaction
 from django.views.decorators.csrf import csrf_exempt
+from common.types import PAYMENT_METHOD_CHOICES
+import logging
+logger = logging.getLogger(__name__) 
+from django.http import HttpResponse, HttpResponseBadRequest
+from django.views.decorators.csrf import csrf_exempt
+
 
 
 class CartCreateView(APIView):
@@ -26,8 +34,8 @@ class CartCreateView(APIView):
         
         user = request.user
 
-        if user.user_type != 'customer':
-            return Response({"error": "Only customers can view their cart."}, status=status.HTTP_403_FORBIDDEN)
+        if not( user.user_type == 'customer' or user.is_staff or user.is_superuser):
+            return api_response(message = "Only customers can view their cart.", status_code=status.HTTP_403_FORBIDDEN)
         
         
         serializer = CartCreateSerializer(data=request.data)
@@ -44,9 +52,9 @@ class CartCreateView(APIView):
                 cart_item.quantity += quantity
                 cart_item.save()
 
-            return Response({"message": "Cart updated successfully."}, status=status.HTTP_201_CREATED)
+            return api_response(message= "Cart updated successfully.", status_code=status.HTTP_201_CREATED)
 
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return api_response(data = serializer.errors, status_code=status.HTTP_400_BAD_REQUEST)
 
 class CartListView(APIView):
     permission_classes = [IsAuthenticated]
@@ -54,8 +62,8 @@ class CartListView(APIView):
     def get(self, request):
         user = request.user
 
-        if user.user_type != 'customer':
-            return Response({"error": "Only customers can view their cart."}, status=403)
+        if not( user.user_type == 'customer' or user.is_staff or user.is_superuser):
+            return api_response(message = "Only customers can view their cart.", status_code=status.HTTP_403_FORBIDDEN)
 
         cart_items = Cart.objects.select_related('menu_item__restaurant').filter(user=user)
         grouped = {}
@@ -82,59 +90,58 @@ class CartListView(APIView):
         for group in grouped.values():
             group["total"] = round(group["total"], 2)
 
-        return Response(list(grouped.values()))
+        return api_response(data = list(grouped.values()), status_code=status.HTTP_200_OK)
 
-class CartItemUpdateView(APIView):
+class CartItemUpdateDeleteView(APIView):
     permission_classes = [IsAuthenticated]
 
     def patch(self, request):
         
         user = request.user
 
-        if user.user_type != 'customer':
-            return Response({"error": "Only customers can view their cart."}, status=status.HTTP_403_FORBIDDEN)
+        if not( user.user_type == 'customer' or user.is_staff or user.is_superuser):
+            return api_response(message = "Only customers can view their cart.", status_code=status.HTTP_403_FORBIDDEN)
         
         
         cart_item_id = request.query_params.get("id")
         if not cart_item_id:
-            return Response({"error": "Cart item ID is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return api_response(message = "Cart item ID is required", status_code=status.HTTP_400_BAD_REQUEST)
 
         try:
             cart_item = Cart.objects.get(id=cart_item_id, user=request.user)
         except Cart.DoesNotExist:
-            return Response({"error": "Cart item not found"}, status=status.HTTP_404_NOT_FOUND)
+            return api_response(message = "Cart item not found", status_code=status.HTTP_404_NOT_FOUND)
 
         serializer = CartSerializer(cart_item, data=request.data, partial=True)
         if serializer.is_valid():
             if serializer.validated_data.get("quantity") == 0:
                 cart_item.delete()
-                return Response({"message": "Cart item deleted because quantity was 0"}, status=status.HTTP_204_NO_CONTENT)
+                return api_response(message= "Cart item deleted because quantity was 0", status_code=status.HTTP_204_NO_CONTENT)
 
             serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-class CartItemDeleteView(APIView):
-    permission_classes = [IsAuthenticated]
-
+            return api_response(data = serializer.data, status_code=status.HTTP_200_OK)
+        return api_response(data = serializer.errors, status_code=status.HTTP_400_BAD_REQUEST)
+    
     def delete(self, request):
         
         user = request.user
 
-        if user.user_type != 'customer':
-            return Response({"error": "Only customers can view their cart."}, status=status.HTTP_403_FORBIDDEN)
+        if not( user.user_type == 'customer' or user.is_staff or user.is_superuser):
+            return api_response(message = "Only customers can view their cart.", status_code=status.HTTP_403_FORBIDDEN)
         
         
         cart_item_id = request.query_params.get("id")
         if not cart_item_id:
-            return Response({"error": "Cart item ID is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return api_response(message = "Cart item ID is required", status_code=status.HTTP_400_BAD_REQUEST)
 
         try:
             cart_item = Cart.objects.get(id=cart_item_id, user=request.user)
             cart_item.delete()
-            return Response({"message": "Cart item deleted"}, status=status.HTTP_204_NO_CONTENT)
+            return api_response(message= "Cart item deleted", status_code=status.HTTP_204_NO_CONTENT)
         except Cart.DoesNotExist:
-            return Response({"error": "Cart item not found"}, status=status.HTTP_404_NOT_FOUND)
+            return api_response(message = "Cart item not found", status_code=status.HTTP_404_NOT_FOUND)
+    
+
     
 class OrderListView(APIView):
     permission_classes = [IsAuthenticated]
@@ -142,12 +149,12 @@ class OrderListView(APIView):
     def get(self, request):
         user = request.user
         
-        if user.user_type != "customer":
-            return Response({"error": "Only customers can access their order list."}, status=status.HTTP_403_FORBIDDEN)
+        if not( user.user_type == 'customer' or user.is_staff or user.is_superuser):
+            return api_response(message = "Only customers can access their order list.", status_code=status.HTTP_403_FORBIDDEN)
 
         user_orders = Orders.objects.filter(user=user).order_by('-placed_at')
         serialized_orders = OrderSerializer(user_orders, many=True)
-        return Response(serialized_orders.data, status=status.HTTP_200_OK)
+        return api_response(data = serialized_orders.data, status_code=status.HTTP_200_OK)
 
 class OrderCreateView(APIView):
     permission_classes = [IsAuthenticated]
@@ -156,45 +163,55 @@ class OrderCreateView(APIView):
     def post(self, request):
         user = request.user
 
-        if user.user_type != 'customer':
-            return Response({"error": "Only customers can place Orders."}, status=status.HTTP_403_FORBIDDEN)
+        if not( user.user_type == 'customer' or user.is_staff or user.is_superuser):
+            return api_response(message = "Only customers can place orders.", 
+                          status_code=status.HTTP_403_FORBIDDEN)
 
         cart_items = Cart.objects.filter(user=user)
         if not cart_items.exists():
-            return Response({"error": "Cart is empty"}, status=status.HTTP_400_BAD_REQUEST)
+            return api_response(message = "Cart is empty", 
+                          status_code=status.HTTP_400_BAD_REQUEST)
 
-        # Group cart items by restaurant
-        restaurant_groups = {}
-        for item in cart_items:
-            rest = item.menu_item.restaurant
-            restaurant_groups.setdefault(rest.id, {
-                "restaurant": rest,
-                "items": []
-            })["items"].append(item)
-
-        selected_restaurant_id = request.data.get("restaurant_id")
-        payment_method = request.data.get("razor_pay", "cash_on_delivery")
-
-        if selected_restaurant_id:
-            try:
-                selected_restaurant_id = UUID(selected_restaurant_id)
-                if selected_restaurant_id not in restaurant_groups:
-                    return Response({"error": "Invalid restaurant_id"}, status=status.HTTP_400_BAD_REQUEST)
-                groups_to_process = {selected_restaurant_id: restaurant_groups[selected_restaurant_id]}
-            except ValueError:
-                return Response({"error": "Invalid restaurant_id format"}, status=status.HTTP_400_BAD_REQUEST)
-        else:
-            groups_to_process = restaurant_groups
-
-        # Address validation
-        address_id = request.query_params.get('address_id') or request.data.get('address_id')
+        # Validate address
+        address_id = request.data.get('address_id')
         if not address_id:
-            return Response({"error": "address_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return api_response(message = "address_id is required",
+                          status_code=status.HTTP_400_BAD_REQUEST)
 
         try:
             saved_address = SavedAddress.objects.get(id=address_id, user=user)
         except SavedAddress.DoesNotExist:
-            return Response({"error": "Address not found."}, status=status.HTTP_404_NOT_FOUND)
+            return api_response(message = "Address not found",
+                          status_code=status.HTTP_404_NOT_FOUND)
+
+        # Group cart items by restaurant
+        restaurant_groups = {}
+        for item in cart_items:
+            restaurant = item.menu_item.restaurant
+            restaurant_groups.setdefault(restaurant.id, {
+                "restaurant": restaurant,
+                "items": []
+            })["items"].append(item)
+
+        # Process selected restaurant or all
+        selected_restaurant_id = request.data.get("restaurant_id")
+        if selected_restaurant_id:
+            try:
+                selected_restaurant_id = UUID(selected_restaurant_id)
+                if selected_restaurant_id not in restaurant_groups:
+                    return api_response(message = "Invalid restaurant_id",
+                                  status_code=status.HTTP_400_BAD_REQUEST)
+                groups_to_process = {selected_restaurant_id: restaurant_groups[selected_restaurant_id]}
+            except ValueError:
+                return api_response(message = "Invalid restaurant_id format",
+                              status_code=status.HTTP_400_BAD_REQUEST)
+        else:
+            groups_to_process = restaurant_groups
+
+        payment_method = request.data.get("payment_method", "cash_on_delivery")
+        if payment_method not in dict(PAYMENT_METHOD_CHOICES):
+            return api_response(message = "Invalid payment method",
+                          status_code=status.HTTP_400_BAD_REQUEST)
 
         created_orders = []
 
@@ -203,17 +220,18 @@ class OrderCreateView(APIView):
             items = group["items"]
             total_amount = sum(i.menu_item.price * i.quantity for i in items)
 
-            # Create order with payment details
+            # Create order
             order = Orders.objects.create(
                 user=user,
                 restaurant=restaurant,
-                delivery_address=saved_address,
+                delivery_address=str(saved_address),
                 total_amount=total_amount,
                 payment_method_type=payment_method,
                 amount_authorized=total_amount,
                 metadata={
                     'restaurant_id': str(restaurant.id),
-                    'address_id': str(saved_address.id)
+                    'address_id': str(saved_address.id),
+                    'cart_items': [str(item.id) for item in items]
                 }
             )
 
@@ -226,51 +244,78 @@ class OrderCreateView(APIView):
                     price=cart_item.menu_item.price
                 )
 
-            # Initiate payment if not cash on delivery
-            if payment_method != 'cash_on_delivery':
-                if not order.initiate_payment(total_amount):
-                    return Response({
+            # Handle payment initiation
+            if payment_method == 'razorpay':
+                payment_context = order.create_razorpay_order(total_amount)
+                if not payment_context:
+                    return api_response(message={
                         'error': 'Payment initiation failed',
-                        'details': order.last_error
-                    }, status=status.HTTP_400_BAD_REQUEST)
+                        'details': order.last_error}
+                    , status_code=status.HTTP_400_BAD_REQUEST)
+            else:  # cash_on_delivery
+                order.payment_method_type =  "cash_on_delivery"
+                order.payment_status = 'authorized'
 
             created_orders.append(order)
-            Cart.objects.filter(id__in=[i.id for i in items]).delete()
+            # cart_items.filter(id__in=[i.id for i in items]).delete()
 
+        # Prepare response
         response_data = {
-            "message": "Order created successfully",
+            "message": "Order(s) created successfully",
             "orders": OrderSerializer(created_orders, many=True).data
         }
 
         if payment_method == 'razorpay':
-            response_data['payment_info'] = [{
-                'order_id': str(order.id),
-                'payment_context': order.get_razorpay_checkout_context()
-            } for order in created_orders]
-
-        return Response(response_data, status=status.HTTP_201_CREATED)
-
+            try:
+                payment_context = order.create_razorpay_order(total_amount)
+                if not payment_context:
+                    return api_response(message = {
+                        'error': 'Payment initiation failed',
+                        'details': 'Could not create Razorpay order'}
+                    , status_code=status.HTTP_400_BAD_REQUEST)
+                    
+                response_data['payment_info'] = {
+                    'order_id': str(order.id),
+                    'razorpay_order_id': order.razorpay_order_id,
+                    'amount': total_amount,
+                    'currency': 'INR',
+                    'key_id': RAZORPAY_KEY_ID
+                }
+                
+            except Exception as e:
+                return api_response(message={
+                    'error': 'Payment processing failed',
+                    'details': str(e)}
+                , status_code=status.HTTP_400_BAD_REQUEST)
+        
+        return api_response(data = response_data, status_code=status.HTTP_201_CREATED)
 class CancelOrderView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
+        
+        user=request.user
+        if not( user.user_type == 'customer' or user.is_staff or user.is_superuser):
+            return api_response(message = "Only customers can cancel their orders.", 
+                          status_code=status.HTTP_403_FORBIDDEN)
+        
         order_id = request.data.get('order_id')
 
         if not order_id:
-            return Response({"error": "Order ID is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return api_response(message = "Order ID is required", status_code=status.HTTP_400_BAD_REQUEST)
 
         try:
-            original_order = Orders.objects.get(id=order_id, user=request.user)
+            original_order = Orders.objects.get(id=order_id, user=user)
         except Orders.DoesNotExist:
-            return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
+            return api_response(message = "Order not found", status_code=status.HTTP_404_NOT_FOUND)
         
         if original_order.status in ['confirmed','out_for_delivery']:
-            return Response({'message':"Order cannot be cancelled after confirmed."})
+            return api_response(message="Order cannot be cancelled after confirmed.", status_code=status.HTTP_405_METHOD_NOT_ALLOWED)
 
         # Check if latest status is already 'cancelled' or 'delivered'
         latest_order = Orders.objects.filter(order_code=original_order.order_code).order_by('-created_at').first()
         if latest_order.status in ['delivered', 'cancelled']:
-            return Response({"error": f"Order already {latest_order.status}"}, status=status.HTTP_400_BAD_REQUEST)
+            return api_response(message = f"Order already {latest_order.status}", status_code=status.HTTP_400_BAD_REQUEST)
 
         # Restore items to cart
         for item in latest_order.order_items.all():
@@ -298,7 +343,7 @@ class CancelOrderView(APIView):
                 price=item.price
             )
 
-        return Response({"message": "Order cancelled and items added back to cart."}, status=status.HTTP_200_OK)
+        return api_response(message= "Order cancelled and items added back to cart.", status_code=status.HTTP_200_OK)
 
     
 class DeleteFinalizedOrdersByOrderCodeView(APIView):
@@ -306,6 +351,18 @@ class DeleteFinalizedOrdersByOrderCodeView(APIView):
 
     def delete(self, request):
         user = request.user
+        
+        if not(user.user_type == 'customer' or user.is_staff or user.is_superuser):
+            return api_response(message = "Only customers can place orders.", 
+                          status_code=status.HTTP_403_FORBIDDEN)
+        
+        order_id = request.data.get("order_id")
+        
+        if order_id:
+            deleted_count, _ = Orders.objects.filter(
+            user=user,
+            id = order_id).delete()
+            return api_response(message= f"{deleted_count} Order(s) deleted",status_code=status.HTTP_200_OK)
 
         latest_orders = (
             Orders.objects
@@ -331,57 +388,127 @@ class DeleteFinalizedOrdersByOrderCodeView(APIView):
             order_code__in=deletable_codes
         ).delete()
 
-        return Response(
-            {"message": f"{deleted_count} orders deleted for finalized order_codes."},
-            status=status.HTTP_200_OK
+        return api_response(
+            message= f"{deleted_count} orders deleted for finalized order_codes.",
+            status_code=status.HTTP_200_OK
         )
         
         
-class RazorpayCallbackView(APIView):
-    permission_classes = [IsAuthenticated]
 
-    @csrf_exempt
-    def dispatch(self, *args, **kwargs):
-        return super().dispatch(*args, **kwargs)
 
-    def post(self, request):
-        try:
-            # Verify webhook signature
-            client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
-            body = request.body.decode('utf-8')
-            signature = request.headers.get('X-Razorpay-Signature')
-            
-            client.utility.verify_webhook_signature(
-                body,
-                signature,
-                settings.RAZORPAY_WEBHOOK_SECRET
-            )
-            
-            data = json.loads(body)
-            event = data['event']
-            payment_data = data['payload']['payment']['entity']
+def payment_page(request, order_id):
+    order = get_object_or_404(Orders, id=order_id, user=request.user)
+    return render(request, 'registration/payment_page.html', {'order': order})
 
-            # Find the order
-            order = Orders.objects.get(
-                gateway_transaction_id=payment_data['order_id'],
-                user=request.user
-            )
+
+    
+@csrf_exempt 
+
+def razorpay_webhook(request):
+    if request.method != 'POST':
+        return HttpResponseBadRequest("Invalid request method")
+    
+    try:
+        # 1. Verify the webhook signature
+        payload = request.body.decode('utf-8')
+        received_signature = request.headers.get('X-Razorpay-Signature')
+        print(payload)
+        print(received_signature)
+        
+        expected_signature = hmac.new(
+            RAZORPAY_WEBHOOK_SECRET.encode(),
+            payload.encode(),
+            hashlib.sha256
+        ).hexdigest()
+        print(expected_signature)
+        
+        # Compare signatures (remove 'sha256=' prefix if present)
+        if not hmac.compare_digest(expected_signature, received_signature.replace('sha256=', '')):
+            return HttpResponseBadRequest("Invalid signature")
+        
+        client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
+        
+        # client.utility.verify_webhook_signature(
+        #     payload,
+        #     received_signature,
+        #     RAZORPAY_WEBHOOK_SECRET
+        # )
+        
+        
+        # 2. Process the event
+        data = json.loads(payload)
+        event = data.get('event')
+        
+        if event == 'order.paid':  
+            order_data = data['payload']['order']['entity']
+            razorpay_order_id = data['payload']['order']['entity']['id']
             
-            if event == 'payment.authorized':
-                order.payment_status = 'authorized'
-                order.payment_authorized_at = timezone.now()
-                order.save()
-                
-            elif event == 'payment.captured':
-                order.payment_status = 'captured'
+            # 3. Update your order
+            try:
+                order = Orders.objects.get(razorpay_order_id=razorpay_order_id)
+                order.payment_status = 'paid'  
                 order.payment_captured_at = timezone.now()
-                order.amount_captured = payment_data['amount'] / 100
+                order.amount_captured = order_data['amount'] / 100  # Convert paise to INR
                 order.save()
                 
-            return Response({'status': 'success'})
+            except Orders.DoesNotExist:
+                logger.error(f"Order not found for Razorpay ID: {razorpay_order_id}")
+                
+        return HttpResponse("OK", status=200)
+        
+    except razorpay.errors.SignatureVerificationError:
+        return HttpResponseBadRequest("Invalid signature")
+    except Exception as e:
+        logger.exception("Webhook processing failed")
+        return HttpResponseBadRequest("Error processing webhook")
+
+
+# @csrf_exempt
+
+# def razorpay_webhook(request):
+#     if request.method != 'POST':
+#         return HttpResponseBadRequest("Invalid request method")
+    
+#     # 1. Get the raw payload and signature
+    
+    
+#     # 2. Verify the signature
+#     try:
+#         payload = request.body.decode('utf-8')
+#         received_signature = request.headers.get('X-Razorpay-Signature', '')    
+        
+#         # Generate expected signature
+#         expected_signature = hmac.new(
+#             RAZORPAY_WEBHOOK_SECRET.encode(),
+#             payload.encode(),
+#             hashlib.sha256
+#         ).hexdigest()
+#         print(expected_signature)
+        
+#         # Compare signatures (remove 'sha256=' prefix if present)
+#         if not hmac.compare_digest(expected_signature, received_signature.replace('sha256=', '')):
+#             return HttpResponseBadRequest("Invalid signature")
+        
+#         # 3. Process the event
+#         data = json.loads(payload)
+#         event = data.get('event')
+        
+#         if event == 'payment.captured':
+#             payment_data = data['payload']['payment']['entity']
+#             order_id = payment_data['order_id']
+#             payment_id = payment_data['id']
+#             amount = payment_data['amount'] / 100  # Convert paise to INR
             
-        except Exception as e:
-            return Response(
-                {'status': 'error', 'message': str(e)},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+#             # Update your database
+#             try:
+#                 order = Orders.objects.get(razorpay_order_id=order_id)
+#                 order.payment_status = 'completed'
+#                 order.razorpay_payment_id = payment_id
+#                 order.amount_paid = amount
+#                 order.save()
+#                 return HttpResponse("Webhook processed", status_code=200)
+#             except Orders.DoesNotExist:
+#                 return HttpResponseBadRequest("Order not found")
+                
+#     except Exception as e:
+#         return HttpResponseBadRequest(f"Error: {str(e)}")

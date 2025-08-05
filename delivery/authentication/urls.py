@@ -1,5 +1,11 @@
 from django.urls import path
-from .views import RegisterView, LoginView, LogoutView, CustomTokenObtainPairView, payment_view
+
+from common.views import RegionListView
+from .views import (RegisterView, LoginView, 
+                    LogoutView, CustomTokenObtainPairView, 
+                    RestaurantRegisterView,
+                    AdminLoginView, DeliveryPartnerRegisterView,
+                    DeliveryPersonRegisterView)
 from django.views.generic import TemplateView
 
 
@@ -19,6 +25,10 @@ urlpatterns = [
     path('api/token/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/token/verify/', TokenVerifyView.as_view(), name='token_verify'),
-    path('payment/', payment_view, name='payment'),
+    path('api/restaurant/register/',RestaurantRegisterView.as_view(), name = 'restaurant_signup'),
+    path('api/delivery_partner/register/',DeliveryPartnerRegisterView.as_view(), name = 'delivery_parnter'),
+    path('api/delivery_person/register/',DeliveryPersonRegisterView.as_view(), name = 'delivery_person'),
+    path('api/admin/login/', AdminLoginView.as_view(), name='admin-login'),
+    path('api/regions/', RegionListView.as_view(), name='region-list'),
     
 ]

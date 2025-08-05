@@ -4,6 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from .models import Rating
 from .serializer import RatingSerializer
+from common.response import api_response
 
 class RatingCreateView(APIView):
     permission_classes = [IsAuthenticated]
@@ -11,8 +12,8 @@ class RatingCreateView(APIView):
     def post(self, request):
         user = request.user
 
-        if user.user_type != 'customer':
-            return Response({"error": "Only customers can rate items."}, status=status.HTTP_403_FORBIDDEN)
+        if not (user.user_type == 'customer' or user.is_staff or user.is_superuser):
+            return api_response(message= "Only customers can rate items.", status_code=status.HTTP_403_FORBIDDEN)
 
         data = request.data.copy()
 
@@ -30,13 +31,13 @@ class RatingCreateView(APIView):
             ).first()
 
             if existing_rating:
-                return Response({"error": "You have already rated this item."}, status=status.HTTP_400_BAD_REQUEST)
+                return api_response(message= "You have already rated this item.", status_code=status.HTTP_400_BAD_REQUEST)
 
             # Save the rating with user from token
             serializer.save(user=user)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return api_response(data=serializer.data, status_code=status.HTTP_201_CREATED)
 
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return api_response(data = serializer.errors, status_code=status.HTTP_400_BAD_REQUEST)
 
 
 class RatingUpdateDeleteView(APIView):
@@ -45,26 +46,29 @@ class RatingUpdateDeleteView(APIView):
     def patch(self, request):
         user = request.user
         rating = Rating.objects.get(user = user)
+        
+        if not (user.user_type == 'customer' or user.is_staff or user.is_superuser):
+            return api_response(message= "Only customers can update ratings.", status_code=status.HTTP_403_FORBIDDEN)
 
     
         if not rating:
-            return Response({'error': 'Rating not found for this user'}, status=status.HTTP_404_NOT_FOUND)
+            return api_response(message= 'Rating not found for this user', status_code=status.HTTP_404_NOT_FOUND)
 
         serializer = RatingSerializer(rating, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
-            return Response({'message': 'Rating updated', 'data': serializer.data})
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return api_response(message= 'Rating updated', data=serializer.data, status_code= status.HTTP_200_OK)
+        return api_response(data =  serializer.errors, status_code=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request):
-        pk = request.query_params.get('pk')
+        pk = request.query_params.get('rating_id')
         if not pk:
-            return Response({'error': 'Rating ID (pk) is required'}, status=status.HTTP_400_BAD_REQUEST)
+            return api_response(message= 'Rating ID is required', status_code=status.HTTP_400_BAD_REQUEST)
 
         rating_instance = self.get_object(pk, request.user)
         if not rating_instance:
-            return Response({'error': 'Rating not found or not owned by user'}, status=status.HTTP_404_NOT_FOUND)
+            return api_response(message= 'Rating not found or not owned by user', status_code=status.HTTP_404_NOT_FOUND)
 
         rating_instance.delete()
-        return Response({'message': 'Rating deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
+        return api_response(message= 'Rating deleted successfully', status_code=status.HTTP_204_NO_CONTENT)
 

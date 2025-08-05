@@ -30,7 +30,7 @@ class Orders(AuditMixin, StatusMixin, PaymentMethodMixin):
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     delivery_address = models.TextField()
     order_code = models.UUIDField(default=uuid.uuid4, editable=False, db_index=True)
-
+    assigned_person = models.OneToOneField(DeliveryPerson, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_order')
 
     def cancel(self, reason=None):
         self.status = 'cancelled'
@@ -50,7 +50,7 @@ class Orders(AuditMixin, StatusMixin, PaymentMethodMixin):
 
 
 
-class OrderItem(models.Model):
+class OrderItem(AuditMixin):
     order = models.ForeignKey(Orders, on_delete=models.CASCADE, related_name='order_items')
     menu_item = models.ForeignKey(MenuItem, on_delete=models.CASCADE)
     quantity = models.IntegerField()

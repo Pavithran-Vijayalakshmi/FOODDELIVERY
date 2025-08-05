@@ -11,6 +11,7 @@ from common.types import VALID_TRANSITIONS
 from user.models import User
 from django.db.models import Max, Q
 from restaurants.models import Restaurant
+from common.response import api_response
 
 
 
@@ -23,7 +24,7 @@ class DeliveryPartnerListView(APIView):
         else:
             partners = Delivery_Partners.objects.all()
         serializer = DeliveryPartnerSerializer(partners, many=True)
-        return Response(serializer.data)
+        return api_response(data=serializer.data, status_code = status.HTTP_200_OK)
 
 class DeliveryPartnerCreateView(APIView):
     permission_classes = [IsAuthenticated]
@@ -32,11 +33,11 @@ class DeliveryPartnerCreateView(APIView):
         user = request.user
 
         if user.user_type != 'delivery_partner':
-            return Response({"detail": "Only delivery partners can create a profile."}, status=status.HTTP_403_FORBIDDEN)
+            return api_response(message= "Only delivery partners can create a profile.", status_code=status.HTTP_403_FORBIDDEN)
 
         # Check if profile already exists
         if hasattr(user, 'delivery_partner_profile'):
-            return Response({"detail": "Profile already exists."}, status=status.HTTP_400_BAD_REQUEST)
+            return api_response(message= "Profile already exists.", status_code=status.HTTP_400_BAD_REQUEST)
 
         data = request.data
         delivery_partner = Delivery_Partners.objects.create(
@@ -56,50 +57,50 @@ class DeliveryPartnerCreateView(APIView):
             restaurants = Restaurant.objects.filter(id__in=restaurant_ids)
             delivery_partner.assigned_restaurants.set(restaurants)
 
-        return Response({
-            "message": "Delivery partner profile created.",
-            "partner_id": delivery_partner.partner_id
-        }, status=status.HTTP_201_CREATED)
+        return api_response(
+            message= "Delivery partner profile created.",
+            data={"partner_id": delivery_partner.partner_id}
+        , status_code=status.HTTP_201_CREATED)
 
 class DeliveryPartnerRetrieveView(APIView):
     def get(self, request):
         partner_id = request.query_params.get('id')
         if not partner_id:
-            return Response({"error": "Missing 'id' in query parameters"}, status=status.HTTP_400_BAD_REQUEST)
+            return api_response(message= "Missing 'id' in query parameters", status_code=status.HTTP_400_BAD_REQUEST)
         try:
             partner = Delivery_Partners.objects.get(pk=partner_id)
         except Delivery_Partners.DoesNotExist:
-            return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+            return api_response(message= "Not found", status_code=status.HTTP_404_NOT_FOUND)
         serializer = DeliveryPartnerSerializer(partner)
-        return Response(serializer.data)
+        return api_response(data=serializer.data, status_code=status.HTTP_200_OK)
 
 class DeliveryPartnerUpdateView(APIView):
     def patch(self, request):
         partner_id = request.query_params.get('id')
         if not partner_id:
-            return Response({"error": "Missing 'id' in query parameters"}, status=status.HTTP_400_BAD_REQUEST)
+            return api_response(message= "Missing 'id' in query parameters", status_code=status.HTTP_400_BAD_REQUEST)
         try:
             partner = Delivery_Partners.objects.get(pk=partner_id)
         except Delivery_Partners.DoesNotExist:
-            return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+            return api_response(message= "Not found", status_code=status.HTTP_404_NOT_FOUND)
         serializer = DeliveryPartnerSerializer(partner, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return api_response(data=serializer.data, status_code=status.HTTP_200_OK)
+        return api_response(serializer.errors, status_code=status.HTTP_400_BAD_REQUEST)
 
 class DeliveryPartnerDeleteView(APIView):
     permission_classes = [IsAuthenticated]
     def delete(self, request):
         partner_id = request.query_params.get('id')
         if not partner_id:
-            return Response({"error": "Missing 'id' in query parameters"}, status=status.HTTP_400_BAD_REQUEST)
+            return api_response(message= "Missing 'id' in query parameters", status_code=status.HTTP_400_BAD_REQUEST)
         try:
             partner = Delivery_Partners.objects.get(pk=partner_id)
         except Delivery_Partners.DoesNotExist:
-            return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+            return api_response(message= "Not found", status_code=status.HTTP_404_NOT_FOUND)
         partner.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return api_response(status_code=status.HTTP_204_NO_CONTENT)
     
 
 class UpdateOrderStatusByPartnerView(APIView):
@@ -108,30 +109,30 @@ class UpdateOrderStatusByPartnerView(APIView):
         user = request.user
         
         if request.user.user_type != 'delivery_partner':
-            return Response({'detail': 'Only delivery partners can update this.'}, status=status.HTTP_403_FORBIDDEN)
+            return api_response(message= 'Only delivery partners can update this.', status_code=status.HTTP_403_FORBIDDEN)
         
         order_id = request.data.get("order_id")
 
         if not order_id:
-            return Response({"error": "Missing order_id"}, status=status.HTTP_400_BAD_REQUEST)
+            return api_response(message= "Missing order_id", status_code=status.HTTP_400_BAD_REQUEST)
 
         try:
             partner = Delivery_Partners.objects.get(user=user)
         except Delivery_Partners.DoesNotExist:
-            return Response({"error": "Delivery Partner not found"}, status=status.HTTP_404_NOT_FOUND)
+            return api_response(message= "Delivery Partner not found", status_code=status.HTTP_404_NOT_FOUND)
 
         try:
             order = Orders.objects.get(id=order_id)
         except Orders.DoesNotExist:
-            return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
+            return api_response(message= "Order not found", status_code=status.HTTP_404_NOT_FOUND)
 
         if not order.assigned_person:
-            return Response({"error": "No delivery person assigned to this order"}, status=status.HTTP_400_BAD_REQUEST)
+            return api_response(message= "No delivery person assigned to this order", status_code=status.HTTP_400_BAD_REQUEST)
 
         delivery_person = order.assigned_person
 
         if delivery_person.partner != partner:
-            return Response({"error": "This delivery person does not belong to your partner account"}, status=status.HTTP_403_FORBIDDEN)
+            return api_response(message= "This delivery person does not belong to your partner account", status_code=status.HTTP_403_FORBIDDEN)
 
         delivery_status = delivery_person.status
 
@@ -139,25 +140,26 @@ class UpdateOrderStatusByPartnerView(APIView):
             'picked_up': 'out_for_delivery',
             'delivered': 'delivered',
             'returned': 'cancelled',
+            'cash_received':'delivered'
         }
         
 
         new_order_status = status_mapping.get(delivery_status)
+        
 
         if not new_order_status:
-            return Response({
-                "error": f"Cannot update order from delivery status: '{delivery_status}'"
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return api_response(message= f"Cannot update order from delivery status: '{delivery_status}'"
+            , status_code=status.HTTP_400_BAD_REQUEST)
 
         if order.status == new_order_status:
-            return Response({"message": "Order is already in that status"}, status=status.HTTP_200_OK)
-
+            return api_response(message= "Order is already in that status", status_code=status.HTTP_200_OK)
+        if new_order_status == 'delivered':
+            order.payment_status = 'paid'
         order.status = new_order_status
         order.save()
 
-        return Response({
-            "message": f"Order status updated to '{new_order_status}'"
-        }, status=status.HTTP_200_OK)
+        return api_response(message= f"Order status updated to '{new_order_status}'"
+        , status_code=status.HTTP_200_OK)
     
     
     
@@ -169,19 +171,19 @@ class DeliveryPersonCreateView(APIView):
         user = request.user
 
         if user.user_type != 'delivery_person':
-            return Response({"detail": "Only delivery persons can create a profile."},
-                            status=status.HTTP_403_FORBIDDEN)
+            return api_response(message= "Only delivery persons can create a profile.",
+                            status_code=status.HTTP_403_FORBIDDEN)
 
         if hasattr(user, 'delivery_person_profile'):
-            return Response({"detail": "Profile already exists."},
-                            status=status.HTTP_400_BAD_REQUEST)
+            return api_response(message= "Profile already exists.",
+                            status_code=status.HTTP_400_BAD_REQUEST)
 
         data = request.data
         partner_id = data.get('partner')
         try:
             partner_instance = Delivery_Partners.objects.get(partner_id=partner_id)
         except Delivery_Partners.DoesNotExist:
-            return Response({"detail": "Invalid partner ID."}, status=status.HTTP_400_BAD_REQUEST)
+            return api_response(message= "Invalid partner ID.", status_code=status.HTTP_400_BAD_REQUEST)
         
         delivery_person = DeliveryPerson.objects.create(
             user=user,
@@ -191,47 +193,78 @@ class DeliveryPersonCreateView(APIView):
             is_available=data.get('is_available'),
             vehicle_number=data.get('vehicle_number'),
         )
-        return Response({
-                "message": "Delivery person profile created.",
-                "person_id": delivery_person.person_id
-            }, status=status.HTTP_201_CREATED)
+        return api_response(message= "Delivery person profile created.",
+                data = {"person_id": delivery_person.person_id}
+            , status_code=status.HTTP_201_CREATED)
 
+
+from django.db import transaction
 
 class UpdateDeliveryPersonStatusView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        
         user = request.user
-        if request.user.user_type != 'delivery_person':
-            return Response({'detail': 'Only delivery persons can create this.'}, status=status.HTTP_403_FORBIDDEN)
-        
+        if not (user.user_type == 'delivery_person' or user.is_staff or user.is_superuser):
+            return api_response(
+                message='Only delivery persons can update their status', 
+                status_code=status.HTTP_403_FORBIDDEN
+            )
         
         new_status = request.data.get("status")
-
         if not new_status:
-            return Response({"error": "Missing status"}, status=status.HTTP_400_BAD_REQUEST)
+            return api_response(
+                message="Status is required", 
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
 
         try:
-            person = DeliveryPerson.objects.get(user = user)
+            person = DeliveryPerson.objects.select_related('assigned_order').get(user=user)
         except DeliveryPerson.DoesNotExist:
-            return Response({"error": "DeliveryPerson not found"}, status=status.HTTP_404_NOT_FOUND)
+            return api_response(
+                message="Delivery Person not found", 
+                status_code=status.HTTP_404_NOT_FOUND
+            )
 
         current_status = person.status
-
+        order = person.assigned_order
+        
+        # Validation checks
+        if not order:
+            return api_response(
+                message=f"No assigned orders. Invalid transition from '{current_status}' to '{new_status}'",
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+        
         if new_status not in VALID_TRANSITIONS.get(current_status, []):
-            return Response({
-                "error": f"Invalid transition from '{current_status}' to '{new_status}'"
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return api_response(
+                message=f"Invalid transition from '{current_status}' to '{new_status}'",
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+            
+        if new_status == 'idle' and order.status not in ['delivered', 'cancelled']:
+            return api_response(
+                message=f"Cannot go idle with active order (status: {order.status})",
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
 
-        person.status = new_status
-        if new_status == 'idle':
-            person.is_available = True
-        person.save()
+        with transaction.atomic():
+            person.status = new_status
+            
+            if new_status == 'idle':
+                person.is_available = True
+                person.assigned_order = None
+                person.save()
+                
+                # Only delete if you're absolutely sure this is what you want
+                order.delete()
+            else:
+                person.save()
 
-        return Response({
-            "message": f"Delivery person status updated to '{new_status}'"
-        }, status=status.HTTP_200_OK)
+        return api_response(
+            message=f"Delivery person status updated to '{new_status}'",
+            status_code=status.HTTP_200_OK
+        )
         
         
 class DeliveryPersonListView(APIView):
@@ -240,20 +273,20 @@ class DeliveryPersonListView(APIView):
     def get(self, request):
         user = request.user
         if request.user.user_type != 'delivery_partner':
-            return Response({'detail': 'Only delivery partners can access this.'}, status=status.HTTP_403_FORBIDDEN)
+            return api_response(message= 'Only delivery partners can access this.', status_code=status.HTTP_403_FORBIDDEN)
 
         try:
             partner = user.delivery_partner_profile  
         except Delivery_Partners.DoesNotExist:
-            return Response({'error': 'Delivery partner profile not found.'}, status=status.HTTP_404_NOT_FOUND)
+            return api_response(message= 'Delivery partner profile not found.', status_code=status.HTTP_404_NOT_FOUND)
 
         if partner.user != request.user:
-            return Response({'error': 'You are not authorized to view delivery persons for this partner.'}, status=status.HTTP_403_FORBIDDEN)
+            return api_response(message= 'You are not authorized to view delivery persons for this partner.', status_code=status.HTTP_403_FORBIDDEN)
 
         delivery_persons = DeliveryPerson.objects.filter(partner=partner)
 
         serializer = DeliveryPersonSerializer(delivery_persons, many=True)
-        return Response(serializer.data)
+        return api_response(data=serializer.data, status_code=status.HTTP_200_OK)
       
 
         
@@ -263,28 +296,29 @@ class AssignOrderToDeliveryPersonView(APIView):
     def post(self, request):
         # Verify user is a delivery partner
         if request.user.user_type != 'delivery_partner':
-            return Response(
-                {'detail': 'Only delivery partners can assign an order.'}, 
-                status=status.HTTP_403_FORBIDDEN
+            return api_response(
+                message= 'Only delivery partners can assign an order.', 
+                status_code=status.HTTP_403_FORBIDDEN
             )
 
         order_id = request.data.get('order_id')
         person_id = request.data.get('person_id')
 
+        
         # Get delivery partner profile
         try:
             delivery_partner = request.user.delivery_partner_profile
         except Delivery_Partners.DoesNotExist:
-            return Response(
-                {'detail': 'Delivery partner profile not found.'},
-                status=status.HTTP_400_BAD_REQUEST
+            return api_response(
+                message= 'Delivery partner profile not found.',
+                status_code=status.HTTP_400_BAD_REQUEST
             )
 
         # Check partner capacity
         if not delivery_partner.has_capacity():
-            return Response(
-                {"error": f"Maximum order limit ({delivery_partner.max_orders}) reached."},
-                status=status.HTTP_400_BAD_REQUEST
+            return api_response(
+                message= f"Maximum order limit ({delivery_partner.max_orders}) reached.",
+                status_code=status.HTTP_400_BAD_REQUEST
             )
 
         # Get delivery person (must belong to this partner)
@@ -294,26 +328,32 @@ class AssignOrderToDeliveryPersonView(APIView):
                 partner=delivery_partner
             )
         except DeliveryPerson.DoesNotExist:
-            return Response(
-                {"error": "Delivery person not found or not associated with your partner account."},
-                status=status.HTTP_404_NOT_FOUND
+            return api_response(
+                message= "Delivery person not found or not associated with your partner account.",
+                status_code=status.HTTP_404_NOT_FOUND
             )
 
         if not delivery_person.is_available:
-            return Response(
-                {"error": "This delivery person is not currently available."},
-                status=status.HTTP_400_BAD_REQUEST
+            return api_response(
+                message= "This delivery person is not currently available.",
+                status_code=status.HTTP_400_BAD_REQUEST
             )
 
         # Get the order
         try:
             order = Orders.objects.get(id=order_id)
         except Orders.DoesNotExist:
-            return Response(
-                {"error": "Order not found."},
-                status=status.HTTP_404_NOT_FOUND
+            return api_response(
+                message= "Order not found.",
+                status_code=status.HTTP_404_NOT_FOUND
             )
-
+        
+        
+        if order.status == 'out_for_delivery':
+            return api_response(
+                message= "Order is already out for delivery .",
+                status_code=status.HTTP_405_METHOD_NOT_ALLOWED
+            )
         # Check restaurant assignment (both direct and via order items)
         restaurant = order.restaurant
         order_item_restaurants = set(
@@ -330,24 +370,24 @@ class AssignOrderToDeliveryPersonView(APIView):
         )
 
         if not all_restaurants & partner_restaurants:
-            return Response(
-                {"error": "No restaurants in this order are assigned to your partner account."},
-                status=status.HTTP_403_FORBIDDEN
+            return api_response(
+                message= "No restaurants in this order are assigned to your partner account.",
+                status_code=status.HTTP_403_FORBIDDEN
             )
 
         # For multi-restaurant orders, require specific restaurant selection
         if len(all_restaurants) > 1:
             selected_restaurant_id = request.data.get("restaurant_id")
             if not selected_restaurant_id:
-                return Response(
-                    {"error": "Multiple restaurants detected. Please specify restaurant_id."},
-                    status=status.HTTP_400_BAD_REQUEST
+                return api_response(
+                    message= "Multiple restaurants detected. Please specify restaurant_id.",
+                    status_code=status.HTTP_400_BAD_REQUEST
                 )
             
             if UUID(selected_restaurant_id) not in partner_restaurants:
-                return Response(
-                    {"error": "Selected restaurant is not assigned to your partner account."},
-                    status=status.HTTP_403_FORBIDDEN
+                return api_response(
+                    message= "Selected restaurant is not assigned to your partner account.",
+                    status_code=status.HTTP_403_FORBIDDEN
                 )
 
         # All checks passed - assign the order
@@ -356,12 +396,12 @@ class AssignOrderToDeliveryPersonView(APIView):
         delivery_person.save()
 
         order.delivery_partner = delivery_partner
-        order.status = "out_for_delivery"
+
         order.save()
 
-        return Response(
-            {"message": "Order assigned successfully."},
-            status=status.HTTP_200_OK
+        return api_response(
+            message= "Order assigned successfully.",
+            status_code=status.HTTP_200_OK
         )
 
 
@@ -372,9 +412,12 @@ class DeliveryPartnerOrderListView(APIView):
     def get(self, request):
         user = request.user
         if user.user_type != 'delivery_partner':
-            return Response({"detail": "You are not authorized to view these orders."},
-                            status=status.HTTP_403_FORBIDDEN)
-
+            return api_response(message= "You are not authorized to view these orders.",
+                            status_code=status.HTTP_403_FORBIDDEN)
+        partner = user.delivery_partner_profile
+        
+        restaurants = partner.assigned_restaurants.all()
+        
         latest_order_map = (
             Orders.objects
             .values('order_code')
@@ -385,7 +428,11 @@ class DeliveryPartnerOrderListView(APIView):
         for entry in latest_order_map:
             latest_q |= Q(order_code=entry['order_code'], created_at=entry['latest_created'])
 
-        orders = Orders.objects.filter(latest_q, status__in=['confirmed', 'out_for_delivery']).order_by('-created_at')
-        
+        orders = Orders.objects.filter(
+            latest_q, 
+            Q(status__in=['confirmed', 'out_for_delivery']) | Q(payment_method_type__in=['cash_on_delivery'])| Q(payment_status__in = ['paid']),restaurant__in=restaurants)\
+                .exclude(Q(status__in=['cancelled','delivered']))\
+                .order_by('-created_at')
+                
         serializer = OrderSerializer(orders, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK) if serializer.data else Response({"detail": "No Live orders."},)
+        return api_response(data=serializer.data, status_code=status.HTTP_200_OK) if serializer.data else api_response(message= "No Live orders.",)
