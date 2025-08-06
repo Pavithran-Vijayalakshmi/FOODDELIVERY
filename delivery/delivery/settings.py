@@ -29,7 +29,7 @@ SECRET_KEY = 'django-insecure-as3ze$9_9o$$fgyhfm-kst5oqgl9gow-mdz$-mt)^y&q@#&#b7
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['cf6c38870150.ngrok-free.app','127.0.0.1','localhost']
+ALLOWED_HOSTS = ['ba7ab0637401.ngrok-free.app','127.0.0.1','localhost']
 
 
 # Application definition
@@ -216,10 +216,10 @@ AUTH_PASSWORD_VALIDATORS = [
 
 RAZORPAY_KEY_ID = 'rzp_test_ovoRNkH3EPcBU9'
 RAZORPAY_KEY_SECRET = 'Ljf9pstFKlcL768vMgWLBoCC'
-RAZORPAY_WEBHOOK_URL = 'https://cf6c38870150.ngrok-free.app/api/orders/razorpay-webhook/'
+RAZORPAY_WEBHOOK_URL = 'https://ba7ab0637401.ngrok-free.app/api/orders/razorpay-webhook/'
 RAZORPAY_WEBHOOK_SECRET = 'qJuBxWv5_kvT22A'
 
-CSRF_TRUSTED_ORIGINS = ['https://cf6c38870150.ngrok-free.app']
+CSRF_TRUSTED_ORIGINS = ['https://ba7ab0637401.ngrok-free.app']
 
 
 

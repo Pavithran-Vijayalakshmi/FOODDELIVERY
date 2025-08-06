@@ -152,9 +152,16 @@ class OrderListView(APIView):
         if not( user.user_type == 'customer' or user.is_staff or user.is_superuser):
             return api_response(message = "Only customers can access their order list.", status_code=status.HTTP_403_FORBIDDEN)
 
-        user_orders = Orders.objects.filter(user=user).order_by('-placed_at')
+        user_orders = Orders.objects.filter(user=user).order_by('-created_at')
         serialized_orders = OrderSerializer(user_orders, many=True)
-        return api_response(data = serialized_orders.data, status_code=status.HTTP_200_OK)
+        print(serialized_orders)
+        return api_response(
+            data={
+            "orders": serialized_orders.data,
+            "key_id": RAZORPAY_KEY_ID,
+            },
+            status_code=status.HTTP_200_OK
+        )
 
 class OrderCreateView(APIView):
     permission_classes = [IsAuthenticated]
@@ -425,14 +432,6 @@ def razorpay_webhook(request):
         # Compare signatures (remove 'sha256=' prefix if present)
         if not hmac.compare_digest(expected_signature, received_signature.replace('sha256=', '')):
             return HttpResponseBadRequest("Invalid signature")
-        
-        client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
-        
-        # client.utility.verify_webhook_signature(
-        #     payload,
-        #     received_signature,
-        #     RAZORPAY_WEBHOOK_SECRET
-        # )
         
         
         # 2. Process the event
