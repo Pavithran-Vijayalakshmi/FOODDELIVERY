@@ -5,7 +5,7 @@ from .views import (RegisterView, LoginView,
                     LogoutView, CustomTokenObtainPairView, 
                     RestaurantRegisterView,
                     AdminLoginView, DeliveryPartnerRegisterView,
-                    DeliveryPersonRegisterView)
+                    DeliveryPersonRegisterView, AdminRegisterView)
 from django.views.generic import TemplateView
 
 
@@ -29,6 +29,7 @@ urlpatterns = [
     path('api/delivery_partner/register/',DeliveryPartnerRegisterView.as_view(), name = 'delivery_parnter'),
     path('api/delivery_person/register/',DeliveryPersonRegisterView.as_view(), name = 'delivery_person'),
     path('api/admin/login/', AdminLoginView.as_view(), name='admin-login'),
+    path('api/admin/register/', AdminRegisterView.as_view(), name = "admin-register"),
     path('api/regions/', RegionListView.as_view(), name='region-list'),
     
 ]

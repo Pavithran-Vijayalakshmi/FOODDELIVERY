@@ -6,7 +6,7 @@ from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
 from django.contrib.auth import authenticate
 from user.models import User
 from user.serializer import UserSerializer
-from .serializer import CustomTokenObtainPairSerializer, RegisterSerializer, LoginSerializer
+from .serializer import CustomTokenObtainPairSerializer, RegisterSerializer, LoginSerializer, AdminRegisterSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.exceptions import TokenError
 from common.response import api_response
@@ -40,7 +40,7 @@ class RestaurantRegisterView(APIView):
             
             serializer.save()
             return api_response(
-                message= "User registered successfully. Please log in to access your account.",
+                message= "Restaurant Owner registered successfully. Please log in to access your account.",
                 data = serializer.data
             , status_code=status.HTTP_201_CREATED)
         return api_response(data = serializer.errors, status_code=status.HTTP_400_BAD_REQUEST)
@@ -54,7 +54,7 @@ class DeliveryPartnerRegisterView(APIView):
             
             serializer.save()
             return api_response(
-                message= "User registered successfully. Please log in to access your account.",
+                message= "Delivery Partner registered successfully. Please log in to access your account.",
                 data = serializer.data
             , status_code=status.HTTP_201_CREATED)
         return api_response(data = serializer.errors, status_code=status.HTTP_400_BAD_REQUEST)
@@ -68,31 +68,10 @@ class DeliveryPersonRegisterView(APIView):
             
             serializer.save()
             return api_response(
-                message= "User registered successfully. Please log in to access your account.",
+                message= "Delivery Person registered successfully. Please log in to access your account.",
                 data = serializer.data
             , status_code=status.HTTP_201_CREATED)
         return api_response(data = serializer.errors, status_code=status.HTTP_400_BAD_REQUEST)
-
-# class LoginView(APIView):
-#     permission_classes = [AllowAny]
-
-#     def post(self, request):
-#         email = request.data.get("email")
-#         password = request.data.get("password")
-#         user = authenticate(request, email=email, password=password) 
-#         if user is not None:
-#             refresh = RefreshToken.for_user(user)
-#             return api_response(
-#                 message = str("Login Successful"),
-#                 data = 
-#                 {
-#                     "refresh": str(refresh),
-#                 "access": str(refresh.access_token),
-#                 }
-#                 )
-#         return api_response(message = "Invalid credentials", status_code=status.HTTP_401_UNAUTHORIZED)
-    
-
 
 class AdminLoginView(APIView):
     permission_classes = [AllowAny]
@@ -203,3 +182,18 @@ class LoginView(APIView):
             },
             status=status.HTTP_200_OK
         )
+        
+        
+class AdminRegisterView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        serializer = AdminRegisterSerializer(data=request.data, context={'user_type': 'admin'})
+        if serializer.is_valid():
+            
+            serializer.save()
+            return api_response(
+                message= "Admin registered successfully. Please log in to access your account.",
+                data = serializer.data
+            , status_code=status.HTTP_201_CREATED)
+        return api_response(data = serializer.errors, status_code=status.HTTP_400_BAD_REQUEST)

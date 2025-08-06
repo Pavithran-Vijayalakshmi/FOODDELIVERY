@@ -1,15 +1,15 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .models import Restaurant, MenuItem
+from .models import Restaurant, MenuItem, Offer
 from .serializer import (RestaurantListSerializer, RestaurantDetailSerializer,
                          MenuItemSerializer, RestaurantCreateSerializer, 
                          MenuItemUpdateSerializer, MenuItemCreateSerializer,
-                         OfferSerializer)
+                         OfferSerializer, RestaurantUpdateSerializer)
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import IsAuthenticatedOrReadOnly,AllowAny,IsAuthenticated, IsAdminUser, DjangoModelPermissions
 from rest_framework.exceptions import PermissionDenied
-from rest_framework.parsers import MultiPartParser
+from rest_framework.parsers import MultiPartParser, JSONParser
 from orders.models import Orders
 from orders.serializer import OrderSerializer
 from django.db.models import Max, Q
@@ -80,9 +80,10 @@ class MenuItemApprovalView(APIView):
 
 class RestaurantCreateView(APIView):
     permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser, MultiPartParser]
 
     def post(self, request):
-        if not (request.user.user_type == 'restaurant_owner' or request.user.is_staff):
+        if not (request.user.user_type == 'restaurant_owner' or request.user.is_staff or request.user.is_superuser):
             return api_response(
                 data="Only restaurant owners or staff can register a restaurant.",
                 status_code=status.HTTP_403_FORBIDDEN
@@ -93,11 +94,11 @@ class RestaurantCreateView(APIView):
             serializer.save()
             return api_response(
                 data={
-                    "message": "Restaurant created successfully. Waiting for admin approval.",
+                    "message": "Restaurant created successfully. Waiting for Admin Approval",
                     "restaurant": serializer.data
                 },
                 status_code=status.HTTP_201_CREATED
-            ) 
+            )
         return api_response(data=serializer.errors,status_code=status.HTTP_400_BAD_REQUEST)
     
 
@@ -106,10 +107,10 @@ class RestaurantListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        queryset = Restaurant.objects.select_related('city', 'city__state','city__state__country').all()
+        queryset = Restaurant.objects.all()
         print(queryset)
         
-        if request.user.user_type == 'customer':
+        if not (request.user.is_staff or request.user.is_superuser):
             queryset = queryset.filter(is_approved=True)
 
         # Get filter parameters
@@ -135,10 +136,10 @@ class RestaurantListView(APIView):
         page = self.paginate_queryset(queryset)
         
         # Choose serializer based on user type
-        if request.user.user_type == 'customer':
-            serializer_class = RestaurantListSerializer
-        else:
+        if request.user.is_staff or request.user.is_superuser:
             serializer_class = RestaurantDetailSerializer
+        else:
+            serializer_class = RestaurantListSerializer
 
         if page is not None:
             serializer = serializer_class(page, many=True)
@@ -189,8 +190,95 @@ class RestaurantDetailView(APIView):
         serializer = RestaurantDetailSerializer(restaurant)
         return api_response(data=serializer.data, status_code=status.HTTP_200_OK) if serializer.data else api_response(status_code=status.HTTP_404_NOT_FOUND)
 
+# class RestaurantUpdateDeleteView(APIView):
+#     permission_classes = [IsAuthenticated]
+
+#     def patch(self, request):
+#         user = request.user
+#         # Check if user has permission to update restaurants
+#         if not (user.user_type == 'restaurant_owner' or user.is_staff or user.is_superuser):
+#             return api_response(
+#                 message="Only restaurant owners or admin can update restaurants",
+#                 status_code=status.HTTP_403_FORBIDDEN
+#             )
+            
+#         restaurant_id = request.query_params.get('id')
+#         if not restaurant_id:
+#             return api_response(
+#                 data="Restaurant ID is required in query parameters (?id=)",
+#                 status_code=status.HTTP_400_BAD_REQUEST
+#             )
+
+#         restaurant = get_object_or_404(Restaurant, id=restaurant_id)
+
+#         # Additional permission check - only owner or admin can update
+#         if not (request.user.is_staff or request.user.is_superuser or restaurant.owner == request.user):
+#             return api_response(
+#                 data="You don't have permission to update this restaurant",
+#                 status_code=status.HTTP_403_FORBIDDEN
+#             )
+
+#         serializer = RestaurantDetailSerializer(restaurant, data=request.data, partial=True)
+#         if serializer.is_valid():
+#             serializer.save()
+#             return api_response(
+#                 message="Restaurant updated successfully",
+#                 data=serializer.data,
+#                 status_code=status.HTTP_200_OK
+#             )
+
+#         return api_response(
+#             data=serializer.errors,
+#             status_code=status.HTTP_400_BAD_REQUEST
+#         )
+    
+#     def delete(self, request):
+#         user = request.user
+#         if not (user.user_type == 'restaurant_owner' or user.is_staff or user.is_superuser):
+#             return api_response(
+#                 message="Only restaurant owners or admin can delete restaurants",
+#                 status_code=status.HTTP_403_FORBIDDEN
+#             )
+            
+#         restaurant_id = request.query_params.get('id')
+#         if not restaurant_id:
+#             return api_response(
+#                 data="Restaurant ID is required in query parameters (?id=)",
+#                 status_code=status.HTTP_400_BAD_REQUEST
+#             )
+
+#         try:
+#             restaurant = Restaurant.objects.get(id=restaurant_id)
+#         except Restaurant.DoesNotExist:
+#             return api_response(
+#                 data="Restaurant not found",
+#                 status_code=status.HTTP_404_NOT_FOUND
+#             )
+
+#         # Check if user is owner or admin
+#         if not (request.user.is_staff or request.user.is_superuser or restaurant.owner == request.user):
+#             return api_response(
+#                 data="You don't have permission to delete this restaurant",
+#                 status_code=status.HTTP_403_FORBIDDEN
+#             )
+
+#         # Optional: Check if restaurant has active orders before deletion
+#         if restaurant.orders.filter(status__in=['pending', 'out_for_delivery']).exists():
+#             return api_response(
+#                 message="Cannot delete restaurant with active orders",
+#                 status_code=status.HTTP_400_BAD_REQUEST
+#             )
+
+#         restaurant.delete()
+#         return api_response(
+#             message="Restaurant deleted successfully",
+#             status_code=status.HTTP_204_NO_CONTENT
+#         )
+
+# In views.py
 class RestaurantUpdateDeleteView(APIView):
     permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, JSONParser]  # For handling file uploads
 
     def patch(self, request):
         user = request.user
@@ -216,10 +304,34 @@ class RestaurantUpdateDeleteView(APIView):
                 data="You don't have permission to update this restaurant",
                 status_code=status.HTTP_403_FORBIDDEN
             )
-
-        serializer = RestaurantDetailSerializer(restaurant, data=request.data, partial=True)
+        data = request.data.dict() if hasattr(request.data, 'dict') else request.data
+        serializer = RestaurantUpdateSerializer(
+            restaurant, 
+            data=data, 
+            partial=True,
+            context={'request': request}
+        )
+        
         if serializer.is_valid():
-            serializer.save()
+            with transaction.atomic():
+                restaurant = serializer.save()
+                
+                # If sensitive fields were updated, notify admin
+                sensitive_fields = [
+                    'pan_card', 'gst_number', 'fssai_license',
+                    'account_holder_name', 'account_number', 'ifsc_code', 
+                    'bank_name', 'upi_id'
+                ]
+                
+                if any(field in serializer.validated_data for field in sensitive_fields):
+                    # notify_admin_about_restaurant_update(restaurant)
+                    
+                    return api_response(
+                        message="Restaurant updated successfully. Changes to sensitive fields require admin approval.",
+                        data=serializer.data,
+                        status_code=status.HTTP_200_OK
+                    )
+                
             return api_response(
                 message="Restaurant updated successfully",
                 data=serializer.data,
@@ -268,13 +380,15 @@ class RestaurantUpdateDeleteView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST
             )
 
+        # Delete related menu items and offers
+        MenuItem.objects.filter(restaurant=restaurant).delete()
+        Offer.objects.filter(restaurant=restaurant).delete()
+        
         restaurant.delete()
         return api_response(
-            message="Restaurant deleted successfully",
+            message="Restaurant and all related data deleted successfully",
             status_code=status.HTTP_204_NO_CONTENT
         )
-
-
 
 
 class MenuCreateView(APIView):

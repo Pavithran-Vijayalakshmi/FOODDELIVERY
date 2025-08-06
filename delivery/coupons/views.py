@@ -70,12 +70,12 @@ class CreateCouponView(APIView):
 
         coupon = get_object_or_404(Coupon, id=coupon_id)
         
-        # Optional: Check if coupon is being used in any active orders
-        if coupon.orders.filter(status__in=['pending', 'processing']).exists():
-            return api_response(
-                message="Cannot delete coupon with active orders",
-                status_code=status.HTTP_400_BAD_REQUEST
-            )
+        # # Optional: Check if coupon is being used in any active orders
+        # if coupon.orders.filter(status__in=['pending', 'processing']).exists():
+        #     return api_response(
+        #         message="Cannot delete coupon with active orders",
+        #         status_code=status.HTTP_400_BAD_REQUEST
+        #     )
 
         coupon.delete()
         return api_response(
@@ -83,6 +83,19 @@ class CreateCouponView(APIView):
             status_code=status.HTTP_204_NO_CONTENT
         )
     
+    
+class CouponListView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        user = request.user
+        if not (user.user_type == 'customer' or user.is_staff or user.is_superuser):
+            return api_response(message= "Only customers or admin can view coupons.", status_code=status.HTTP_403_FORBIDDEN)
+        
+        coupons = Coupon.objects.all()
+        serializer = CouponSerializer(coupons, many=True)
+        return api_response(data = serializer.data, status_code=status.HTTP_200_OK)
+                
 class RemoveCouponView(APIView):
     permission_classes = [IsAuthenticated]
     

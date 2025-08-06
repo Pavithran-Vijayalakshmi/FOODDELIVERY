@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from .models import User, Favorite, SavedAddress
-from .serializer import (UserSerializer,UserCreateSerializer,
+from .serializer import (UserSerializer, UserCreateSerializer,
                          FavoriteSerializer,SavedAddressSerializer, 
                          UserProfileUpdateSerializer,
                          AdminUserCreateSerializer,AdminUserSerializer,
@@ -10,7 +10,7 @@ from .serializer import (UserSerializer,UserCreateSerializer,
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
 from restaurants.models import Restaurant, MenuItem
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, JSONParser
 from common.response import api_response
 from django.db.models import Q
 
@@ -40,18 +40,22 @@ class AdminUserCreateView(APIView):
         )
 
 class UserListCreateView(APIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
         return User.objects.all()
     
     def get(self, request):
+        if not(request.user.is_staff or request.user.is_superuser):
+            return api_response(status_code=status.HTTP_401_UNAUTHORIZED,message="Only Admins can see the user details")
         users = self.get_queryset()
         serializer = UserSerializer(users, many=True)
         return api_response(status_code=status.HTTP_200_OK,data=serializer.data)
     
     
     def post(self, request):
+        if not(request.user.is_staff or request.user.is_superuser):
+            return api_response(status_code=status.HTTP_401_UNAUTHORIZED,message="Only Admins can create users.")
         serializer = UserCreateSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
@@ -62,11 +66,11 @@ class UserListCreateView(APIView):
 
 class UpdateUserProfileView(APIView):
     permission_classes = [IsAuthenticated]
-    # parser_classes = [MultiPartParser, FormParser]
+    parser_classes = [MultiPartParser, JSONParser] 
     
     def patch(self, request):
         user = request.user
-        if not (user.user_type == 'customer' or user.is_staff or user.is_superuser):
+        if not (user.is_staff or user.is_superuser or user.user_type == 'customer'):
             return api_response(message="Only customers or admin can update the profile",
                              status_code=status.HTTP_403_FORBIDDEN)
         data = request.data
@@ -89,7 +93,7 @@ class MeView(APIView):
     def get(self, request):
         user = request.user
 
-        if not (user.user_type == 'customer' or user.is_staff or user.is_superuser):
+        if not (user.is_staff or user.is_superuser or user.user_type == 'customer'):
             return api_response(data="Only customers can access this information.", status_code=status.HTTP_403_FORBIDDEN)
 
         serializer = UserSerializer(user)
@@ -104,7 +108,7 @@ class FavoriteCreateView(APIView):
     def post(self, request):
         user = request.user
 
-        if not (user.user_type == 'customer' or user.is_staff or user.is_superuser):
+        if not (user.is_staff or user.is_superuser or user.user_type == 'customer'):
             return api_response(data= "Only customers can create favorites.", status_code=status.HTTP_403_FORBIDDEN)
 
         restaurant_id = request.data.get('restaurant_id')   
@@ -137,7 +141,7 @@ class FavoriteUpdateView(APIView):
     def patch(self, request):
         user = request.user
 
-        if not (user.user_type == 'customer' or user.is_staff or user.is_superuser):
+        if not (user.is_staff or user.is_superuser or user.user_type == 'customer'):
             return api_response(data= "Only customers can update favorites.", status_code=status.HTTP_403_FORBIDDEN)
 
         restaurant_id = request.query_params.get('restaurant')
@@ -181,7 +185,7 @@ class FavoriteDeleteView(APIView):
 
     def delete(self, request):
         user = request.user
-        if not (user.user_type == 'customer' or user.is_staff or user.is_superuser):
+        if not (user.is_staff or user.is_superuser or user.user_type == 'customer'):
             return api_response(data= "Only customers can delete favorites.", status_code=status.HTTP_400_BAD_REQUEST)
 
         restaurant_id = request.query_params.get('restaurant')
@@ -209,16 +213,16 @@ class SavedAddressListCreateView(APIView):
 
     def get(self, request):
         user = request.user
-        if not (user.user_type == 'customer' or user.is_staff or user.is_superuser):
+        if not (user.is_staff or user.is_superuser or user.user_type == 'customer'):
             return api_response(data= 'Only customers or admin can view saved addresses.', status_code=status.HTTP_400_BAD_REQUEST)
 
         addresses = SavedAddress.objects.filter(user=user)
         serializer = SavedAddressSerializer(addresses, many=True)
-        return api_response(data = serializer.data)
+        return api_response(data = serializer.data, status_code=status.HTTP_200_OK)
 
     def post(self, request):
         user = request.user
-        if not (user.user_type == 'customer' or user.is_staff or user.is_superuser):
+        if not (user.is_staff or user.is_superuser or user.user_type == 'customer'):
             return api_response(
                 data={'message': 'Only customers can add saved addresses.'},
                 status_code=status.HTTP_403_FORBIDDEN
@@ -253,7 +257,7 @@ class SavedAddressUpdateDeleteView(APIView):
 
     def patch(self, request):
         user = request.user
-        if not (user.user_type == 'customer' or user.is_staff or user.is_superuser):
+        if not (user.is_staff or user.is_superuser or user.user_type == 'customer'):
             return api_response(data= 'Only customers or admin can update addresses.', status_code=status.HTTP_400_BAD_REQUEST)
 
         address_id = request.query_params.get('address_id')
@@ -275,7 +279,7 @@ class SavedAddressUpdateDeleteView(APIView):
 
     def delete(self, request):
         user = request.user
-        if not (user.user_type == 'customer' or user.is_staff or user.is_superuser):
+        if not (user.is_staff or user.is_superuser or user.user_type == 'customer'):
             return api_response(data= 'Only customers can delete addresses.', status_code=status.HTTP_400_BAD_REQUEST)
 
         address_id = request.query_params.get('address_id')

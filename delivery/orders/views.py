@@ -257,7 +257,7 @@ class OrderCreateView(APIView):
                 order.payment_status = 'authorized'
 
             created_orders.append(order)
-            # cart_items.filter(id__in=[i.id for i in items]).delete()
+            cart_items.filter(id__in=[i.id for i in items]).delete()
 
         # Prepare response
         response_data = {
@@ -462,53 +462,3 @@ def razorpay_webhook(request):
         logger.exception("Webhook processing failed")
         return HttpResponseBadRequest("Error processing webhook")
 
-
-# @csrf_exempt
-
-# def razorpay_webhook(request):
-#     if request.method != 'POST':
-#         return HttpResponseBadRequest("Invalid request method")
-    
-#     # 1. Get the raw payload and signature
-    
-    
-#     # 2. Verify the signature
-#     try:
-#         payload = request.body.decode('utf-8')
-#         received_signature = request.headers.get('X-Razorpay-Signature', '')    
-        
-#         # Generate expected signature
-#         expected_signature = hmac.new(
-#             RAZORPAY_WEBHOOK_SECRET.encode(),
-#             payload.encode(),
-#             hashlib.sha256
-#         ).hexdigest()
-#         print(expected_signature)
-        
-#         # Compare signatures (remove 'sha256=' prefix if present)
-#         if not hmac.compare_digest(expected_signature, received_signature.replace('sha256=', '')):
-#             return HttpResponseBadRequest("Invalid signature")
-        
-#         # 3. Process the event
-#         data = json.loads(payload)
-#         event = data.get('event')
-        
-#         if event == 'payment.captured':
-#             payment_data = data['payload']['payment']['entity']
-#             order_id = payment_data['order_id']
-#             payment_id = payment_data['id']
-#             amount = payment_data['amount'] / 100  # Convert paise to INR
-            
-#             # Update your database
-#             try:
-#                 order = Orders.objects.get(razorpay_order_id=order_id)
-#                 order.payment_status = 'completed'
-#                 order.razorpay_payment_id = payment_id
-#                 order.amount_paid = amount
-#                 order.save()
-#                 return HttpResponse("Webhook processed", status_code=200)
-#             except Orders.DoesNotExist:
-#                 return HttpResponseBadRequest("Order not found")
-                
-#     except Exception as e:
-#         return HttpResponseBadRequest(f"Error: {str(e)}")

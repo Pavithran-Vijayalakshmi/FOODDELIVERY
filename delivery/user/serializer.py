@@ -1,62 +1,18 @@
+import phonenumbers
 from rest_framework import serializers
 from .models import User, Favorite, SavedAddress
 from orders.models import Cart, Orders
 from orders.serializer import OrderSerializer, CartSerializer
 from restaurants.models import Restaurant, MenuItem, Offer, Category
-from restaurants.serializer import  RestaurantDetailSerializer, MenuItemSerializer, OfferSerializer
+from restaurants.serializer import  RestaurantDetailSerializer, MenuItemSerializer, OfferSerializer, RestaurantCreateSerializer
 from decimal import Decimal
 from common.models import City, Country,State
 from ratings.models import Rating
 from django.utils import timezone
 from django.db.models import Avg
 
-class AdminUserSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = [
-            'id', 'email', 'name', 'phone_region','phone_number', 'user_type', 'is_admin',
-            'admin_access_level', 'is_active', 'created_at', 'last_login'
-        ]
-        read_only_fields = ['id', 'created_at', 'last_login']
 
-class AdminUserCreateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = [
-            'email', 'name', 'phone_region','phone_number', 'password', 'user_type',
-            'is_admin', 'admin_access_level'
-        ]
-        extra_kwargs = {'password': {'write_only': True}}
-    
-    def create(self, validated_data):
-        user = User.objects.create_user(
-            email=validated_data['email'],
-            password=validated_data['password'],
-            name=validated_data['name'],
-            phone=validated_data['phone'],
-            user_type=validated_data.get('user_type', 'customer'),
-            is_admin=validated_data.get('is_admin', False),
-            admin_access_level=validated_data.get('admin_access_level')
-        )
-        return user
-
-
-
-class UserSerializer(serializers.ModelSerializer):
-    orders = OrderSerializer(many=True, read_only=True)
-    cart = serializers.SerializerMethodField()
-    favorites = serializers.SerializerMethodField()
-    saved_addresses= serializers.SerializerMethodField()
-    
-
-    class Meta:
-        model = User
-        fields = [
-            'id', 'username', 'email', 'phone_region','phone_number', 'user_type', 'created_at',
-            'orders', 'cart',  'favorites','saved_addresses',
-        ]
-        
-    def get_cart(self, obj):
+def get_cart(self, obj):
         cart_items = Cart.objects.filter(user=obj).select_related('menu_item__restaurant')
         grouped = {}
 
@@ -83,61 +39,185 @@ class UserSerializer(serializers.ModelSerializer):
 
         return list(grouped.values())
 
-    def get_favorites(self, obj):
-        favorites_qs = Favorite.objects.filter(user=obj)
-        return FavoriteSerializer(favorites_qs, many=True).data
-    
-    def get_saved_addresses(self, obj):
-        saved_addresses = SavedAddress.objects.filter(user=obj)
-        return SavedAddressSerializer(saved_addresses, many=True).data
-    
-    
-class UserCreateSerializer(serializers.ModelSerializer):
+def get_favorites(self, obj):
+    favorites_qs = Favorite.objects.filter(user=obj)
+    return FavoriteSerializer(favorites_qs, many=True).data
+        
+def get_saved_addresses(self, obj):
+    saved_addresses = SavedAddress.objects.filter(user=obj)
+    return SavedAddressSerializer(saved_addresses, many=True).data
+
+class AdminUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = [
+            'id', 'email', 'name', 'phone_region','phone_number', 'user_type', 'is_admin',
+            'admin_access_level', 'is_active', 'created_at',
+        ]
+        read_only_fields = ['id', 'created_at']
     
 
+class AdminUserCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = [
+            'email', 'name', 'phone_region','phone_number', 'password', 'user_type',
+            'is_admin', 'admin_access_level'
+        ]
+        extra_kwargs = {'password': {'write_only': True}}
+    
+    def create(self, validated_data):
+        user = User.objects.create_user(
+            email=validated_data['email'],
+            password=validated_data['password'],
+            name=validated_data['name'],
+            phone=validated_data['phone'],
+            user_type=validated_data.get('user_type', 'admin'),
+            is_admin=validated_data.get('is_admin', False),
+            admin_access_level=validated_data.get('admin_access_level')
+        )
+        return user
+
+
+
+class UserSerializer(serializers.ModelSerializer):
+    orders = OrderSerializer(many=True, read_only=True)
+    cart = serializers.SerializerMethodField()
+    favorites = serializers.SerializerMethodField()
+    saved_addresses = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            'id', 'email', 'phone_region', 'phone_number', 'user_type', 'created_at',
+            'orders', 'cart', 'favorites', 'saved_addresses',
+        ]
+
+    def get_cart(self, obj):
+        return get_cart(self, obj)
+
+    def get_favorites(self, obj):
+        return get_favorites(self, obj)
+
+    def get_saved_addresses(self, obj):
+        return get_saved_addresses(self, obj)
+
+class UserCreateSerializer(serializers.ModelSerializer):
+    
     class Meta:
         model = User
         fields = ['username', 'email', 'phone_region','phone_number', 'user_type'
         ]
         
+
+
 class UserProfileUpdateSerializer(serializers.ModelSerializer):
-    dob = serializers.DateField(format="%Y-%m-%d", input_formats=["%Y-%m-%d"])
+    dob = serializers.DateField(format="%Y-%m-%d", input_formats=["%Y-%m-%d"], required=False)
     
-    # Add nested serializers for read-only name fields
+    # Read-only fields for display
     country_name = serializers.CharField(source='country.name', read_only=True)
     state_name = serializers.CharField(source='state.name', read_only=True)
     city_name = serializers.CharField(source='city.name', read_only=True)
     
+    # Address fields that can be updated
+    address_line1 = serializers.CharField(required=False)
+    address_line2 = serializers.CharField(required=False, allow_blank=True)
+    city = serializers.PrimaryKeyRelatedField(
+        queryset=City.objects.all(), 
+        required=False,
+        help_text="ID of the city"
+    )
+    state = serializers.PrimaryKeyRelatedField(
+        queryset=State.objects.all(), 
+        required=False,
+        help_text="ID of the state"
+    )
+    country = serializers.PrimaryKeyRelatedField(
+        queryset=Country.objects.all(), 
+        required=False,
+        help_text="ID of the country"
+    )
+    pincode = serializers.CharField(required=False)
+    label = serializers.CharField(
+        required=False,
+        help_text="Label for the address (e.g., Home, Work)"
+    )
+
     class Meta:
         model = User
         fields = [
             'name', 'email', 'phone_region', 'phone_number', 'dob', 'gender', 'profile_picture',
-            'address_line1', 'address_line2',  'city_name',
-             'state_name', 'pincode', 
-             'country_name', 'label'
+            'address_line1', 'address_line2', 'city', 'state', 'country', 'pincode', 'label',
+            'country_name', 'state_name', 'city_name',
+            'account_holder_name', 'account_number', 'ifsc_code', 'bank_name', 'upi_id'
         ]
         extra_kwargs = {
-            'email': {'required': False},
+            'email': {'read_only': True},  # Email shouldn't be changed
             'phone_number': {'required': False},
+            'profile_picture': {'required': False}
         }
 
+    def validate(self, data):
+        # Validate phone number format if provided
+        phone_number = data.get('phone_number')
+        if phone_number:
+            region = data.get('phone_region', self.instance.phone_region if self.instance else None)
+            if not region:
+                raise serializers.ValidationError(
+                    {"phone_number": "Phone region is required when updating phone number"}
+                )
+            
+            try:
+                parsed = phonenumbers.parse(phone_number, region.code)
+                if not phonenumbers.is_valid_number(parsed):
+                    raise serializers.ValidationError(
+                        {"phone_number": "Invalid phone number for the selected region"}
+                    )
+            except phonenumbers.NumberParseException:
+                raise serializers.ValidationError(
+                    {"phone_number": "Invalid phone number format"}
+                )
+
+        # Validate address completeness if any address fields are provided
+        address_fields = ['address_line1', 'city', 'state', 'country', 'pincode']
+        if any(field in data for field in address_fields):
+            missing_fields = [field for field in address_fields if field not in data]
+            if missing_fields:
+                raise serializers.ValidationError(
+                    {field: "This field is required when updating address" for field in missing_fields}
+                )
+
+        return data
+
     def update(self, instance, validated_data):
+        # Handle profile picture separately
+        profile_picture = validated_data.pop('profile_picture', None)
+        if profile_picture is not None:
+            instance.profile_picture = profile_picture
+
+        # Handle address data
         label = validated_data.pop('label', None)
-        
-        # Update user fields
+        address_data = {
+            'address_line1': validated_data.pop('address_line1', None),
+            'address_line2': validated_data.pop('address_line2', None),
+            'city': validated_data.pop('city', None),
+            'state': validated_data.pop('state', None),
+            'country': validated_data.pop('country', None),
+            'pincode': validated_data.pop('pincode', None),
+        }
+
+        # Update basic profile fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
+
         instance.save()
 
-        # Prepare address data for SavedAddress
-        address_fields = ['address_line1', 'address_line2', 'city', 'state', 'pincode', 'country']
-        address_data = {field: getattr(instance, field) for field in address_fields if getattr(instance, field, None)}
-        
-        if label and address_data:
-            saved_address, created = SavedAddress.objects.update_or_create(
+        # Save address if all required fields are present
+        if all(address_data.values()) and label:
+            SavedAddress.objects.update_or_create(
                 user=instance,
                 label=label,
-                defaults={**address_data}
+                defaults=address_data
             )
 
         return instance

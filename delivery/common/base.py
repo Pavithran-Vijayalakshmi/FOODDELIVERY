@@ -11,8 +11,7 @@ from delivery.settings import RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET
 import razorpay
 import os
 from uuid import uuid4
-
-
+from django.core.validators import RegexValidator
 
 
 
@@ -100,7 +99,22 @@ class AuditMixin(models.Model):
     class Meta:
         abstract = True
 
-
+class PhoneNumberMixin(models.Model):
+    region = models.ForeignKey(
+        Region,
+        on_delete=models.PROTECT,
+        related_name='profiles',
+        null=True,
+    )
+    phone = models.CharField(
+        max_length=15,
+        unique=True,
+        null=True,
+        blank=True
+    )
+    
+    class Meta:
+        abstract = True
 
 
 class AddressMixin(models.Model):
@@ -143,77 +157,11 @@ def upload_to(instance, filename):
     return f"{instance._meta.model_name}/{new_filename}"
 
 class MediaMixin(models.Model):
-    image = models.ImageField(upload_to='%Y/%m/%d/', blank=True, null=True)
+    image = models.ImageField(upload_to='userProfile/', blank=True, null=True)
 
     class Meta:
         abstract = True
         
-# class MediaMixin(models.Model):
-#     image = models.ImageField(
-#         upload_to=upload_to,
-#         blank=True,
-#         null=True,
-#         max_length=255,  # Recommended for production
-#         help_text="Upload an image file (JPEG, PNG, etc.)"
-#     )
-    
-#     class Meta:
-#         abstract = True
-
-#     @property
-#     def image_url(self):
-#         """Returns full URL if image exists, otherwise None"""
-#         if self.image and hasattr(self.image, 'url'):
-#             return self.image.url
-#         return None
-    
-#     def save(self, *args, **kwargs):
-#         """Process image before saving"""
-#         if self.image:
-#             try:
-#                 # Open the image
-#                 img = Image.open(self.image)
-                
-#                 # Convert to RGB if necessary
-#                 if img.mode != 'RGB':
-#                     img = img.convert('RGB')
-                
-#                 # Optimize image quality and size
-#                 img.thumbnail((1200, 1200))  # Resize while maintaining aspect ratio
-                
-#                 # Save optimized image
-#                 output = BytesIO()
-#                 img.save(output, format='JPEG', quality=85, optimize=True)
-#                 output.seek(0)
-                
-#                 # Generate new filename
-#                 ext = os.path.splitext(self.image.name)[1].lower()
-#                 new_name = f"{uuid4().hex}{ext}"
-                
-#                 # Save to model
-#                 self.image.save(
-#                     new_name,
-#                     ContentFile(output.getvalue()),
-#                     save=False
-#                 )
-#             except Exception as e:
-#                 # Handle image processing errors gracefully
-#                 raise ValidationError(f"Error processing image: {str(e)}")
-        
-#         super().save(*args, **kwargs)
-
-#     def validate_image(image):
-#         """Validate uploaded image"""
-#         # Check file size (2MB max)
-#         max_size = 2 * 1024 * 1024
-#         if image.size > max_size:
-#             raise ValidationError(f"Image too large (Max {max_size/1024/1024}MB allowed)")
-        
-#         # Check file extension
-#         valid_extensions = ['.jpg', '.jpeg', '.png', '.webp']
-#         ext = os.path.splitext(image.name)[1].lower()
-#         if ext not in valid_extensions:
-#             raise ValidationError(f"Unsupported file extension. Allowed: {', '.join(valid_extensions)}")
 
 class PriceMixin(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -226,23 +174,20 @@ class PriceMixin(models.Model):
 
 
 
-from django.core.validators import RegexValidator
 
 class ComplianceAndBankDetailsMixin(models.Model):
     # PAN Card
     pan_card = models.CharField(
         max_length=10,
-        unique=True,
         validators=[
             RegexValidator(regex=r'^[A-Z]{5}[0-9]{4}[A-Z]$',message="Enter a valid PAN card number")],
-        null=True
     )
 
     # GST Number (optional)
     gst_number = models.CharField(
         max_length=15,
         blank=True,
-        null=True,
+        unique = True,
         validators=[
             RegexValidator(
                 regex=r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$',
@@ -254,18 +199,19 @@ class ComplianceAndBankDetailsMixin(models.Model):
     # FSSAI License
     fssai_license = models.CharField(
         max_length=14,
+        unique=True,
         validators=[
             RegexValidator(
                 regex=r'^\d{14}$',
                 message="Enter a valid 14-digit FSSAI license number"
             )
         ],
-        null=True
+
     )
 
     # Images
-    menu_image = models.ImageField(upload_to='restaurant/menus/', null=True, blank=True)
-    profile_image = models.ImageField(upload_to='restaurant/profiles/', null=True, blank=True)
+    menu_image = models.ImageField(upload_to='restaurant/menus/', blank=True)
+    profile_image = models.ImageField(upload_to='restaurant/profiles/',  blank=True)
     class Meta:
         abstract = True
 

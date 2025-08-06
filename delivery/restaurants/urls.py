@@ -15,7 +15,8 @@ from .views import (
     RestaurantOrderListView,
     RestaurantApprovalView,
     MenuItemApprovalView,
-    MenuItemListView
+    MenuItemListView,
+    RestaurantUpdateDeleteView
     
 )
 
@@ -24,6 +25,7 @@ app_name = "restaurants"
 urlpatterns = [
     path('', RestaurantListView.as_view(), name='restaurant-list'),
     path('create/',RestaurantCreateView.as_view(),name = 'restaurant-create'),
+    path('update-delete/',RestaurantUpdateDeleteView.as_view(), name='restaurant-update-delete'),
     path('approve_restaurant/',RestaurantApprovalView.as_view(), name = 'approve-restaurant'),
     path('approve/menu_item/',MenuItemApprovalView.as_view(),name='approve-menu-item'),
     path('detail/', RestaurantDetailView.as_view(), name='restaurant-detail'),

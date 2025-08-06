@@ -7,14 +7,13 @@ from common.base import (AuditMixin, AddressMixin,
                          MediaMixin, PriceMixin, 
                          StatusMixin, TimeRangeMixin,
                          ComplianceAndBankDetailsMixin,
-                         RestaurantPaymentInfoMixin, BankDetailsMixin, PaymentMethodMixin, ProfileMixin)
+                         RestaurantPaymentInfoMixin, BankDetailsMixin, PhoneNumberMixin)
 from phonenumber_field.modelfields import PhoneNumberField
 from common.types import RESTAURANT_TYPE_CHOICES, MENU_ITEM_TYPE_CHOICES
-
+from common.models import Region
 
 class Restaurant(AuditMixin, AddressMixin, StatusMixin,
-                 ComplianceAndBankDetailsMixin, RestaurantPaymentInfoMixin,
-                 BankDetailsMixin):
+                 ComplianceAndBankDetailsMixin, RestaurantPaymentInfoMixin, BankDetailsMixin):
     
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -25,18 +24,31 @@ class Restaurant(AuditMixin, AddressMixin, StatusMixin,
     
     name = models.CharField(max_length=100)
     description = models.TextField(default='')
-    restaurant_primary_phone = PhoneNumberField(unique=True, region='IN')
-    email = models.EmailField()
+    restaurant_primary_phone = PhoneNumberField(region='IN')
+    email = models.EmailField(unique=True)
     opening_time = models.TimeField()
     closing_time = models.TimeField()
     is_open = models.BooleanField(default=True)
-    restaurant_type = models.CharField(max_length=10, choices=RESTAURANT_TYPE_CHOICES, default='both')
+    restaurant_type = models.CharField(max_length=10, choices=RESTAURANT_TYPE_CHOICES, default = True)
     is_approved = models.BooleanField(default=False)
+    
+    region = models.ForeignKey(
+        Region,
+        on_delete=models.PROTECT,
+        related_name='restaurants',
+        help_text="Determines valid phone number format"
+    )
+    business_phone = models.CharField(
+        max_length=15,
+        unique=True,
+        blank=True
+    )
 
     class Meta:
         unique_together = ('name', 'city')
         unique_together = ('name', 'email')
         unique_together = ('name', 'address_line1')
+        unique_together = ('address_line1', 'city')
         verbose_name_plural = "Restaurants"
         permissions = [
             ("can_approve_restaurant", "Can approve restaurant"),

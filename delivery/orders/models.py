@@ -13,7 +13,7 @@ class Cart(AuditMixin):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='cart')
     menu_item = models.ForeignKey(MenuItem, on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField(default=1)
-    applied_coupon = models.ForeignKey(Coupon, null=True, blank=True, on_delete=models.SET_NULL)
+    applied_coupon = models.ForeignKey(Coupon, null=True, blank=True, on_delete=models.SET_NULL, related_name='cart')
 
     class Meta:
         unique_together = ('user', 'menu_item')

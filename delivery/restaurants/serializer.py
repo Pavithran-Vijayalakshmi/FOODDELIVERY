@@ -1,11 +1,30 @@
 from datetime import timedelta
 from django.utils import timezone
+import phonenumbers
 from rest_framework import serializers
 from ratings.models import Rating
 from .models import Restaurant, MenuItem, Offer, Category
 from django.db.models import Avg
-from common.models import Country,City, State
+from common.models import Country,City, State, Region
+from django.core.exceptions import ValidationError
+import datetime
 
+class TimeAMPMField(serializers.Field):
+    """Custom field to handle AM/PM time input"""
+    
+    def to_representation(self, value):
+        # Convert 24-hour time to 12-hour AM/PM format when displaying
+        if value:
+            return value.strftime('%I:%M %p')
+        return None
+    
+    def to_internal_value(self, data):
+        # Convert 12-hour AM/PM input to 24-hour time
+        try:
+            time_obj = datetime.datetime.strptime(data, '%I:%M %p').time()
+            return time_obj
+        except ValueError:
+            raise ValidationError("Invalid time format. Please use 'HH:MM AM/PM' format (e.g., '09:30 AM' or '05:45 PM')")
 
 
 
@@ -14,6 +33,7 @@ class RestaurantListSerializer(serializers.ModelSerializer):
     state_name = serializers.SerializerMethodField()
     city_name = serializers.SerializerMethodField()
     average_rating = serializers.SerializerMethodField()
+    
 
     class Meta:
         model = Restaurant
@@ -47,13 +67,20 @@ class RestaurantDetailSerializer(serializers.ModelSerializer):
     total_ratings = serializers.SerializerMethodField()
     menu_items = serializers.SerializerMethodField()
     offers = serializers.SerializerMethodField()
+    opening_time = TimeAMPMField()
+    closing_time = TimeAMPMField()
 
     class Meta:
         model = Restaurant
-        fields = ['id', 'name', 'description', 'country_name', 'state_name', 'city_name',
-                  'restaurant_primary_phone', 'email',
-                  'opening_time', 'closing_time', 'is_open', 'created_at',
-                  'average_rating', 'total_ratings', 'menu_items', 'offers','is_approved']
+        fields = fields = [
+            'id', 'name', 'description', 'email', 'region','business_phone','opening_time', 'closing_time', 
+            'is_open', 'restaurant_type', 'address_line1', 'address_line2', 
+            'pincode', 'latitude', 'longitude','menu_items',
+            'pan_card', 'gst_number', 'fssai_license', 'menu_image', 'profile_image',
+            'payout_frequency', 'payment_method_preference', 'commission_percentage',
+            'account_holder_name', 'account_number', 'ifsc_code', 'bank_name', 'upi_id',
+            'country_name', 'state_name', 'city_name', 'average_rating','total_ratings','offers', 'is_approved'
+        ]
 
     def get_average_rating(self, obj):
         if Rating.objects.filter(restaurant=obj) is not None:
@@ -83,27 +110,175 @@ class RestaurantDetailSerializer(serializers.ModelSerializer):
     def get_city_name(self, obj):
         return obj.city.name if obj.city else None
     
+# class RestaurantCreateSerializer(serializers.ModelSerializer):
+#     country_name = serializers.CharField(source='country.name', read_only=True)
+#     state_name = serializers.CharField(source='state.name', read_only=True)
+#     city_name = serializers.CharField(source='city.name', read_only=True)
+#     opening_time = TimeAMPMField()
+#     closing_time = TimeAMPMField()
+#     class Meta:
+#         model = Restaurant
+#         fields = fields = [
+#             'id', 'name', 'description', 'city','state','country','email', 'region','business_phone','opening_time', 'closing_time', 
+#             'is_open', 'restaurant_type', 'address_line1', 'address_line2', 
+#             'pincode', 'latitude', 'longitude',
+#             'pan_card', 'gst_number', 'fssai_license', 'menu_image', 'profile_image',
+#             'account_holder_name', 'account_number', 'ifsc_code', 'bank_name', 'upi_id',
+#             'country_name', 'state_name', 'city_name','is_approved'
+#         ]
+#         read_only_fields = ['is_approved'] 
+#         extra_kwargs = {
+#             'name': {'required': True}, 
+#             'email': {'required': True},
+#             'opening_time': {'required': True}, 
+#             'closing_time': {'required': True}, 
+#             'is_open': {'required': True}, 
+#             'restaurant_type': {'required': True},
+#             'address_line1': {'required': True},
+#             'account_holder_name': {'required': True}, 
+#             'account_number': {'required': True}, 
+#             'ifsc_code': {'required': True}, 
+#             'bank_name': {'required': True},
+#             'city': {'required': True},
+#             'state': {'required': True},
+#             'country': {'required': True},
+#             'pan_card': {'required': True},
+#             'menu_image':{'required': True},
+#             'profile_image' :{'required': True},
+#             'fssai_license': {'required': True},
+#             'gst_number': {'required': False},
+#         }
+        
+#     def validate(self, data):
+#         region = data.get('region')
+#         business_phone = data.get('business_phone')
+        
+#         if region and business_phone:
+#             try:
+#                 # Format: +<calling_code><business_phone> (e.g., +15551234567)
+#                 full_number = f"+{region.calling_code}{business_phone}"
+#                 parsed = phonenumbers.parse(full_number, region.code)
+                
+#                 if not phonenumbers.is_valid_number(parsed):
+#                     raise serializers.ValidationError({
+#                         'business_phone': 'Invalid phone number for the selected region'
+#                     })
+                
+#                 # Store formatted number in E.164 format
+#                 data['formatted_phone'] = phonenumbers.format_number(
+#                     parsed, 
+#                     phonenumbers.PhoneNumberFormat.E164
+#                 )
+                
+#             except phonenumbers.NumberParseException:
+#                 raise serializers.ValidationError({
+#                     'business_phone': 'Invalid phone number format'
+#                 })
+#         return data
+    
+#     def create(self, validated_data):
+#         region = validated_data.pop('region')
+#         business_phone = validated_data.pop('business_phone')
+#         formatted_phone = validated_data.pop('formatted_phone')
+        
+#         # Create restaurant but mark as unapproved by default
+#         restaurant = Restaurant.objects.create(
+#             **validated_data,
+#             owner=self.context['request'].user,
+#             region=region,
+#             business_phone=business_phone,
+#             is_approved=False
+#         )
+#         return restaurant
+
 class RestaurantCreateSerializer(serializers.ModelSerializer):
+    opening_time = TimeAMPMField()
+    closing_time = TimeAMPMField()
+    business_phone = serializers.CharField(required=True)
+    region = serializers.PrimaryKeyRelatedField(
+        queryset=Region.objects.all(),
+        required=True
+    )
     country_name = serializers.CharField(source='country.name', read_only=True)
     state_name = serializers.CharField(source='state.name', read_only=True)
     city_name = serializers.CharField(source='city.name', read_only=True)
+
     class Meta:
         model = Restaurant
         fields = [
-            'id', 'name', 'city', 'country_name', 'state_name', 'city_name', 'description', 'restaurant_primary_phone', 'email',
-            'opening_time', 'closing_time', 'is_open','restaurant_type'
+            'id', 'name', 'description', 'email', 'opening_time', 'closing_time', 
+            'is_open', 'restaurant_type', 'address_line1', 'address_line2', 
+            'pincode', 'latitude', 'longitude', 'business_phone', 'region',
+            'pan_card', 'gst_number', 'fssai_license', 'menu_image', 'profile_image',
+            'account_holder_name', 'account_number', 'ifsc_code', 'bank_name', 'upi_id',
+            'country_name', 'state_name', 'city_name', 'is_approved',
         ]
-        read_only_fields = ['is_approved'] 
+        read_only_fields = ['is_approved', 'country_name', 'state_name', 'city_name']
+        extra_kwargs = {
+            'name': {'required': True},
+            'email': {'required': True},
+            'opening_time': {'required': True},
+            'closing_time': {'required': True},
+            'address_line1': {'required': True},
+            'account_holder_name': {'required': True},
+            'account_number': {'required': True},
+            'ifsc_code': {'required': True},
+            'bank_name': {'required': True},
+            'pan_card': {'required': True},
+            'menu_image': {'required': True},
+            'profile_image': {'required': True},
+            'fssai_license': {'required': True},
+            # Remove any default values for required fields
+        }
+
+    def validate(self, data):
+        region = data.get('region')
+        phone_number = data.get('business_phone')
+        
+        if not region or not phone_number:
+            raise serializers.ValidationError({
+                'business_phone': 'Both region and phone number are required'
+            })
+
+        try:
+            full_number = f"+{region.calling_code}{phone_number}"
+            parsed = phonenumbers.parse(full_number, region.code)
+            
+            if not phonenumbers.is_valid_number(parsed):
+                raise serializers.ValidationError({
+                    'business_phone': 'Invalid phone number for the selected region'
+                })
+            
+            data['formatted_phone'] = phonenumbers.format_number(
+                parsed, 
+                phonenumbers.PhoneNumberFormat.E164
+            )
+            
+        except phonenumbers.NumberParseException as e:
+            raise serializers.ValidationError({
+                'business_phone': f'Invalid phone number format: {str(e)}'
+            })
+
+        if data['opening_time'] >= data['closing_time']:
+            raise serializers.ValidationError({
+                'closing_time': 'Closing time must be after opening time'
+            })
+
+        return data
 
     def create(self, validated_data):
-        # Create restaurant but mark as unapproved by default
+        region = validated_data.pop('region')
+        phone_number = validated_data.pop('business_phone')
+        formatted_phone = validated_data.pop('formatted_phone', None)
+        
         restaurant = Restaurant.objects.create(
             **validated_data,
             owner=self.context['request'].user,
+            region=region,
+            business_phone=phone_number,
             is_approved=False
         )
         return restaurant
-    
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -211,3 +386,51 @@ class OfferSerializer(serializers.ModelSerializer):
     
         
     
+# In serializer.py
+class RestaurantUpdateSerializer(serializers.ModelSerializer):
+    country_name = serializers.CharField(source='country.name', read_only=True)
+    state_name = serializers.CharField(source='state.name', read_only=True)
+    city_name = serializers.CharField(source='city.name', read_only=True)
+    
+    class Meta:
+        model = Restaurant
+        fields = [
+            'id', 'name', 'description', 'email', 'opening_time', 'closing_time', 
+            'is_open', 'restaurant_type', 'address_line1', 'address_line2', 'city', 
+            'state', 'country', 'pincode', 'latitude', 'longitude',
+            'pan_card', 'gst_number', 'fssai_license', 'menu_image', 'profile_image',
+            'payout_frequency', 'payment_method_preference', 'commission_percentage',
+            'account_holder_name', 'account_number', 'ifsc_code', 'bank_name', 'upi_id',
+            'country_name', 'state_name', 'city_name'
+        ]
+        read_only_fields = ['is_approved']
+
+    def validate(self, data):
+        # Check if sensitive fields are being updated
+        sensitive_fields = [
+            'pan_card', 'gst_number', 'fssai_license',
+            'account_holder_name', 'account_number', 'ifsc_code', 'bank_name', 'upi_id'
+        ]
+        
+        if any(field in data for field in sensitive_fields):
+            # If any sensitive field is being updated, require admin approval again
+            data['is_approved'] = False
+            
+        return data
+
+    def update(self, instance, validated_data):
+        # Handle file uploads separately if needed
+        menu_image = validated_data.pop('menu_image', None)
+        profile_image = validated_data.pop('profile_image', None)
+        
+        if menu_image:
+            instance.menu_image = menu_image
+        if profile_image:
+            instance.profile_image = profile_image
+            
+        # Update all other fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+            
+        instance.save()
+        return instance

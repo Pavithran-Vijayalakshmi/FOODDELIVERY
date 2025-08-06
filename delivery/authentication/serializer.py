@@ -33,23 +33,6 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 
 
-
-# class LoginSerializer(serializers.Serializer):
-    
-#     email = serializers.CharField(required=True)
-#     password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
-
-#     def validate(self, data):
-#         user = authenticate(email=data['email'], password=data['password'])
-#         if user is None:
-#             raise serializers.ValidationError("Invalid email or password")
-#         if not user.is_active:
-#             raise serializers.ValidationError("User account is disabled")
-#         data['user'] = user
-#         return data
-
-
-
 class LoginSerializer(serializers.Serializer):
     email_or_phone = serializers.CharField(required=True)
     password = serializers.CharField(
@@ -169,3 +152,82 @@ class RegisterSerializer(serializers.ModelSerializer):
         user.save()
         return user    
 
+
+class AdminRegisterSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(
+        write_only=True,
+        validators=[validate_password],
+        style={'input_type': 'password'},
+        help_text=_("Password must meet Django's password validation rules.")
+    )
+    
+    phone_region = serializers.PrimaryKeyRelatedField(
+        queryset=Region.objects.all(),
+        write_only=True,
+        help_text="ID of the phone region"
+    )
+    
+    phone_number = serializers.CharField(
+        write_only=True,
+        help_text="Phone number without country code (e.g., '5551234567')"
+    )
+
+    class Meta:
+        model = User
+        fields = ['email',  'password', 'phone_region', 'phone_number']
+        extra_kwargs = {
+            'password': {'write_only': True}
+        }
+
+    def validate(self, data):
+        region = data.get('phone_region')
+        phone_number = data.get('phone_number')
+        
+        if region and phone_number:
+            try:
+                # Format: +<calling_code><phone_number> (e.g., +15551234567)
+                full_number = f"+{region.calling_code}{phone_number}"
+                parsed = phonenumbers.parse(full_number, region.code)
+                
+                if not phonenumbers.is_valid_number(parsed):
+                    raise serializers.ValidationError({
+                        'phone_number': 'Invalid phone number for the selected region'
+                    })
+                
+                # Store formatted number in E.164 format
+                data['formatted_phone'] = phonenumbers.format_number(
+                    parsed, 
+                    phonenumbers.PhoneNumberFormat.E164
+                )
+                
+            except phonenumbers.NumberParseException:
+                raise serializers.ValidationError({
+                    'phone_number': 'Invalid phone number format'
+                })
+                
+        request = self.context.get('request')
+        if request and not request.user.is_superuser:
+            raise serializers.ValidationError({
+            'email': 'Only existing admins can create admin accounts'})
+            
+        return data
+
+    def create(self, validated_data):
+        region = validated_data.pop('phone_region')
+        phone_number = validated_data.pop('phone_number')
+        formatted_phone = validated_data.pop('formatted_phone')
+        
+        user_type = self.context.get('user_type', 'admin')
+        
+        user = User.objects.create(
+            email=validated_data['email'],
+            user_type=user_type,
+            phone_region=region,
+            phone_number=phone_number,
+            is_staff=True,
+            is_superuser=True
+        )
+        
+        user.set_password(validated_data['password'])
+        user.save()
+        return user 
