@@ -1,20 +1,16 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from rest_framework.authentication import authenticate
-from restaurants.models import Restaurant
-from django.core.validators import RegexValidator
 from django.contrib.auth.password_validation import validate_password
 from django.utils.translation import gettext_lazy as _
 import phonenumbers
 from common.base import Region
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
-from delivery.backend import EmailOrPhoneBackend
 
 
 User = get_user_model()
 
-from orders.models import Orders
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 

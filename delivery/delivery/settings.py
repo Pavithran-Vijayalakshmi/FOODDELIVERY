@@ -15,9 +15,10 @@ from pathlib import Path
 import os
 from django.urls import reverse_lazy
 from datetime import timedelta
-from decouple import config
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
+from celery.schedules import crontab
+from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(os.path.join(BASE_DIR, '.env'))
 
 
 # Quick-start development settings - unsuitable for production
@@ -111,11 +112,11 @@ WSGI_APPLICATION = 'delivery.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config("POSTGRES_DB"),
-        'USER': config("POSTGRES_USER"),
-        'PASSWORD': config("POSTGRES_PASSWORD"),
-        'HOST': config("DB_HOST", "localhost"),
-        'PORT': config("DB_PORT", 5432),
+        'NAME': os.environ.get("POSTGRES_DB"),
+        'USER': os.environ.get("POSTGRES_USER"),
+        'PASSWORD': os.environ.get("POSTGRES_PASSWORD"),
+        'HOST': os.environ.get("DB_HOST", "localhost"),
+        'PORT': os.environ.get("DB_PORT", 5432),
     }
 }
 
@@ -237,3 +238,35 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 2621440  # 2.5MB
 IMAGE_MAX_WIDTH = 1920
 IMAGE_MAX_HEIGHT = 1080
 ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+
+
+# EMAIL_BACKEND = 'django.core.mail.backends.filebased.EmailBackend'
+# EMAIL_FILE_PATH = '/tmp/app-messages'  # Change this path
+# EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+DEFAULT_FROM_EMAIL = 'pavithranvijayalakshmi@gmail.com'
+
+# Email Configuration
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'  # For Gmail
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'pavithranvijayalakshmi@gmail.com'  # Your email
+EMAIL_HOST_PASSWORD = 'mpvb hvua zovx sgez'  # NOT your regular password (see below)
+
+# settings.py
+CELERY_BEAT_SCHEDULE = {
+    # Daily promotions at 10 AM
+    'send-daily-promotions': {
+        'task': 'orders.tasks.send_daily_promotions',
+        'schedule': crontab(hour=15, minute=0),  # 10:00 AM daily
+    },
+}
+
+
+# Celery settings
+CELERY_BROKER_URL = 'redis://localhost:6379/0'  # or your broker URL
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'UTC'

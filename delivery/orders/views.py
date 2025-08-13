@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from common.response import api_response
 from delivery.settings import RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_URL, RAZORPAY_WEBHOOK_SECRET
-from .models import Cart, Orders, OrderItem
+from .models.models import Cart, Orders, OrderItem
 from .serializer import CartCreateSerializer, CartItemUpdateSerializer, CartSerializer, OrderSerializer, OrderItemSerializer
 from django.shortcuts import get_object_or_404, redirect, render
 from rest_framework.permissions import IsAuthenticated
@@ -24,6 +24,7 @@ import logging
 logger = logging.getLogger(__name__) 
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.views.decorators.csrf import csrf_exempt
+from user.models import User
 
 
 
@@ -265,6 +266,32 @@ class OrderCreateView(APIView):
 
             created_orders.append(order)
             cart_items.filter(id__in=[i.id for i in items]).delete()
+            
+            
+            from .tasks import send_order_confirmation_email, create_in_app_notification
+            
+            # Send email (async)
+            send_order_confirmation_email.delay(order.id)
+            
+            # In-app notification for customer (async)
+            create_in_app_notification.delay(
+                user_id=user.id,
+                title="Order Confirmed!",
+                message=f"Your order #{order.id} has been placed.",
+                notification_type="order_confirmation",
+            )
+            
+            # # Notify restaurant staff (async)
+            # restaurant_staff = User.objects.filter(restaurant=restaurant, user_type='restaurant_staff')
+            # for staff in restaurant_staff:
+            #     create_in_app_notification.delay(
+            #         user_id=staff.id,
+            #         title="New Order",
+            #         message=f"New order #{order.id} received.",
+            #         notification_type="new_order",
+            #         order_id=order.id,
+            #     )
+
 
         # Prepare response
         response_data = {
@@ -296,6 +323,8 @@ class OrderCreateView(APIView):
                 , status_code=status.HTTP_400_BAD_REQUEST)
         
         return api_response(data = response_data, status_code=status.HTTP_201_CREATED)
+
+
 class CancelOrderView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -352,7 +381,7 @@ class CancelOrderView(APIView):
 
         return api_response(message= "Order cancelled and items added back to cart.", status_code=status.HTTP_200_OK)
 
-    
+
 class DeleteFinalizedOrdersByOrderCodeView(APIView):
     permission_classes = [IsAuthenticated]
 

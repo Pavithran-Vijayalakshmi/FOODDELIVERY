@@ -1,8 +1,10 @@
 import phonenumbers
 from rest_framework import serializers
+
+from orders.models.notification import Notification
 from .models import User, Favorite, SavedAddress
-from orders.models import Cart, Orders
-from orders.serializer import OrderSerializer, CartSerializer
+from orders.models.models import Cart, Orders
+from orders.serializer import OrderSerializer, CartSerializer, UserNotificationSerializer
 from restaurants.models import Restaurant, MenuItem, Offer, Category
 from restaurants.serializer import  RestaurantDetailSerializer, MenuItemSerializer, OfferSerializer, RestaurantCreateSerializer
 from decimal import Decimal
@@ -79,18 +81,17 @@ class AdminUserCreateSerializer(serializers.ModelSerializer):
         return user
 
 
-
 class UserSerializer(serializers.ModelSerializer):
     orders = OrderSerializer(many=True, read_only=True)
     cart = serializers.SerializerMethodField()
     favorites = serializers.SerializerMethodField()
     saved_addresses = serializers.SerializerMethodField()
-
+    notifications = serializers.SerializerMethodField()
     class Meta:
         model = User
         fields = [
             'id', 'email', 'phone_region', 'phone_number', 'user_type', 'created_at',
-            'orders', 'cart', 'favorites', 'saved_addresses',
+            'orders', 'cart', 'favorites', 'saved_addresses', 'notifications'
         ]
 
     def get_cart(self, obj):
@@ -101,6 +102,10 @@ class UserSerializer(serializers.ModelSerializer):
 
     def get_saved_addresses(self, obj):
         return get_saved_addresses(self, obj)
+    
+    def get_notifications(self, obj):
+        notifications = Notification.objects.filter(user=obj)
+        return UserNotificationSerializer(notifications, many=True).data
 
 class UserCreateSerializer(serializers.ModelSerializer):
     
@@ -109,6 +114,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
         fields = ['username', 'email', 'phone_region','phone_number', 'user_type'
         ]
         
+    
 
 
 class UserProfileUpdateSerializer(serializers.ModelSerializer):

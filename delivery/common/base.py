@@ -118,7 +118,7 @@ class PhoneNumberMixin(models.Model):
 
 
 class AddressMixin(models.Model):
-    address_line1 = models.CharField(max_length=150, blank=False, null=True)
+    address_line1 = models.CharField(max_length=150, blank=False, null=True, unique=True)
     address_line2 = models.CharField(max_length=150, blank=True, null=True)
     city = models.ForeignKey(City, on_delete=models.SET_NULL, null=True)
     state = models.ForeignKey(State, on_delete=models.SET_NULL, null=True)
@@ -157,7 +157,7 @@ def upload_to(instance, filename):
     return f"{instance._meta.model_name}/{new_filename}"
 
 class MediaMixin(models.Model):
-    image = models.ImageField(upload_to='userProfile/', blank=True, null=True)
+    image = models.ImageField(upload_to=upload_to, blank=True, null=True)
 
     class Meta:
         abstract = True
@@ -350,7 +350,6 @@ class PaymentMethodMixin(models.Model):
             models.Index(fields=['merchant_reference_id']),
         ]
 
-    # --- Updated Methods Below ---
 
     def initiate_payment(self, amount, currency='INR', **kwargs):
         """Handles Razorpay Order creation or COD authorization."""
@@ -458,8 +457,7 @@ class PaymentMethodMixin(models.Model):
                 'captured': self.payment_captured_at.isoformat() if self.payment_captured_at else None,
             }
         }
-        
-        
+
     def create_razorpay_order(self, amount):
         """Creates a Razorpay order and returns payment context"""
         try:

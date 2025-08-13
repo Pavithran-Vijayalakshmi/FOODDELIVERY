@@ -3,7 +3,7 @@ from django.urls import path
 from common.views import RegionListView
 from .views import (RegisterView, LoginView, 
                     LogoutView, CustomTokenObtainPairView, 
-                    RestaurantRegisterView,
+                    RestaurantRegisterView,DeliveryPersonLogoutView,
                     AdminLoginView, DeliveryPartnerRegisterView,
                     DeliveryPersonRegisterView, AdminRegisterView)
 from django.views.generic import TemplateView
@@ -31,5 +31,6 @@ urlpatterns = [
     path('api/admin/login/', AdminLoginView.as_view(), name='admin-login'),
     path('api/admin/register/', AdminRegisterView.as_view(), name = "admin-register"),
     path('api/regions/', RegionListView.as_view(), name='region-list'),
+    path('api/deliveryperson/logout/',DeliveryPersonLogoutView.as_view(), name='delivery-person-logout'),
     
 ]

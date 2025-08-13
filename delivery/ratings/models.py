@@ -2,7 +2,7 @@ from django.db import models
 from user.models import User
 from delivery import settings
 from restaurants.models import Restaurant
-from orders.models import MenuItem
+from orders.models.models import MenuItem
 from common.base import AuditMixin
 
 class Rating(AuditMixin):

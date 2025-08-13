@@ -9,6 +9,7 @@ from coupons.models import Coupon
 from common.base import AuditMixin, AddressMixin, ProfileMixin, BankDetailsMixin
 from common import types
 from datetime import date
+from common.base import upload_to
 
 class UserManager(BaseUserManager):
     def create_user(self, email, password=None, phone_number=None, **extra_fields):
@@ -42,7 +43,7 @@ class User(AbstractUser, AuditMixin, AddressMixin, ProfileMixin, BankDetailsMixi
     email = models.EmailField(unique=True)
     username = None
     user_type = models.CharField(max_length=20, choices=types.USER_TYPE_CHOICES, default='customer')
-    profile_picture = models.ImageField(upload_to='profile_pics/', blank=True, null=True)
+    profile_picture = models.ImageField(upload_to=upload_to, blank=True, null=True)
     
     REQUIRED_FIELDS = []
     USERNAME_FIELD = 'email'

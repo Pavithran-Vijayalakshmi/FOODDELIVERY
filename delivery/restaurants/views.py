@@ -10,7 +10,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework.permissions import IsAuthenticatedOrReadOnly,AllowAny,IsAuthenticated, IsAdminUser, DjangoModelPermissions
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.parsers import MultiPartParser, JSONParser
-from orders.models import Orders
+from orders.models.models import Orders
 from orders.serializer import OrderSerializer
 from django.db.models import Max, Q
 from common.response import api_response

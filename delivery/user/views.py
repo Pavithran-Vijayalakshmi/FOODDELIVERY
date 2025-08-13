@@ -13,6 +13,7 @@ from restaurants.models import Restaurant, MenuItem
 from rest_framework.parsers import MultiPartParser, JSONParser
 from common.response import api_response
 from django.db.models import Q
+from django.utils import timezone
 
 
 class AdminUserListView(APIView):
@@ -77,6 +78,18 @@ class UpdateUserProfileView(APIView):
         serializer = UserProfileUpdateSerializer(user, data=data, partial=True)
         if serializer.is_valid():
             serializer.save()
+            
+            from orders.tasks import send_notification_task
+            send_notification_task.delay(
+                user_id=user.id,
+                title="Profile Updated",
+                message="Your profile information has been successfully updated.",
+                notification_type='account',
+                metadata={
+                    'update_time': timezone.now().isoformat(),
+                    'updated_fields': list(data.keys())
+                }
+            )
                 
             return api_response(
                 message="Profile updated successfully.",

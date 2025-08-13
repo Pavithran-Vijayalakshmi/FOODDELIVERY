@@ -43,7 +43,22 @@ class Restaurant(AuditMixin, AddressMixin, StatusMixin,
         unique=True,
         blank=True
     )
-
+    REQUIRED_FIELDS = ['name',
+            'email',
+            'opening_time',
+            'closing_time',
+            'address_line1',
+            'account_holder_name',
+            'account_number',
+            'ifsc_code',
+            'bank_name',
+            'city',
+            'state',
+            'country',
+            'pan_card',
+            'menu_image',
+            'profile_image',
+            'fssai_license',]
     class Meta:
         unique_together = ('name', 'city')
         unique_together = ('name', 'email')

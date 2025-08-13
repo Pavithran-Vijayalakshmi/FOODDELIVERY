@@ -1,6 +1,24 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+NOTIFICATION_TYPES = (
+        ('order', 'Order Update'),
+        ('promotion', 'Promotion'),
+        ('system', 'System Notification'),
+        ('payment', 'Payment Update'),
+        ('delivery', 'Delivery Update'),
+        ('review', 'Review'),
+        ('account', 'Account Activity'),
+    )
+
+PRIORITY_CHOICES = (
+        ('low', 'Low'),
+        ('medium', 'Medium'),
+        ('high', 'High'),
+        ('urgent', 'Urgent'),
+    )
+
+
 
 GENDER_CHOICES = [
         ('Male', 'Male'),
@@ -73,3 +91,9 @@ PAYMENT_STATUS_CHOICES = [
         ('refund_initiated', 'Refund Initiated'),
         ('refunded', 'Refunded'),
     ]
+
+class NotificationType(models.TextChoices):
+        ORDER = "ORDER", "Order Update"
+        PAYMENT = "PAYMENT", "Payment"
+        PROMOTION = "PROMOTION", "Promotion"
+        SYSTEM = "SYSTEM", "System"

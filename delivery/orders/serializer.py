@@ -1,8 +1,7 @@
 from decimal import Decimal
 from rest_framework import serializers
-
-from coupons.models import CouponUsage
-from .models import Orders, Cart, OrderItem
+from .models.models import Orders, Cart, OrderItem
+from .models.notification import Notification
 from restaurants.serializer import MenuItemSerializer
 from django.utils import timezone
 
@@ -68,3 +67,14 @@ class OrderSerializer(serializers.ModelSerializer):
         fields = ['id','order_code', 'user', 'restaurant', 'total_amount', 'status', 'created_at',
                   'delivery_address', 'order_items', 'payment_method_type','payment_status', 'razorpay_order_id']
 
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = ['id', 'user', 'title', 'message', 'notification_type', 'is_read', 'created_at', 'read_at']
+        read_only_fields = ['is_read', 'read_at']
+        
+class UserNotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = [ 'user', 'title', 'message', 'notification_type']
+        

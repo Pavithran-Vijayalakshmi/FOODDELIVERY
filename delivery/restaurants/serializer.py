@@ -110,86 +110,6 @@ class RestaurantDetailSerializer(serializers.ModelSerializer):
     def get_city_name(self, obj):
         return obj.city.name if obj.city else None
     
-# class RestaurantCreateSerializer(serializers.ModelSerializer):
-#     country_name = serializers.CharField(source='country.name', read_only=True)
-#     state_name = serializers.CharField(source='state.name', read_only=True)
-#     city_name = serializers.CharField(source='city.name', read_only=True)
-#     opening_time = TimeAMPMField()
-#     closing_time = TimeAMPMField()
-#     class Meta:
-#         model = Restaurant
-#         fields = fields = [
-#             'id', 'name', 'description', 'city','state','country','email', 'region','business_phone','opening_time', 'closing_time', 
-#             'is_open', 'restaurant_type', 'address_line1', 'address_line2', 
-#             'pincode', 'latitude', 'longitude',
-#             'pan_card', 'gst_number', 'fssai_license', 'menu_image', 'profile_image',
-#             'account_holder_name', 'account_number', 'ifsc_code', 'bank_name', 'upi_id',
-#             'country_name', 'state_name', 'city_name','is_approved'
-#         ]
-#         read_only_fields = ['is_approved'] 
-#         extra_kwargs = {
-#             'name': {'required': True}, 
-#             'email': {'required': True},
-#             'opening_time': {'required': True}, 
-#             'closing_time': {'required': True}, 
-#             'is_open': {'required': True}, 
-#             'restaurant_type': {'required': True},
-#             'address_line1': {'required': True},
-#             'account_holder_name': {'required': True}, 
-#             'account_number': {'required': True}, 
-#             'ifsc_code': {'required': True}, 
-#             'bank_name': {'required': True},
-#             'city': {'required': True},
-#             'state': {'required': True},
-#             'country': {'required': True},
-#             'pan_card': {'required': True},
-#             'menu_image':{'required': True},
-#             'profile_image' :{'required': True},
-#             'fssai_license': {'required': True},
-#             'gst_number': {'required': False},
-#         }
-        
-#     def validate(self, data):
-#         region = data.get('region')
-#         business_phone = data.get('business_phone')
-        
-#         if region and business_phone:
-#             try:
-#                 # Format: +<calling_code><business_phone> (e.g., +15551234567)
-#                 full_number = f"+{region.calling_code}{business_phone}"
-#                 parsed = phonenumbers.parse(full_number, region.code)
-                
-#                 if not phonenumbers.is_valid_number(parsed):
-#                     raise serializers.ValidationError({
-#                         'business_phone': 'Invalid phone number for the selected region'
-#                     })
-                
-#                 # Store formatted number in E.164 format
-#                 data['formatted_phone'] = phonenumbers.format_number(
-#                     parsed, 
-#                     phonenumbers.PhoneNumberFormat.E164
-#                 )
-                
-#             except phonenumbers.NumberParseException:
-#                 raise serializers.ValidationError({
-#                     'business_phone': 'Invalid phone number format'
-#                 })
-#         return data
-    
-#     def create(self, validated_data):
-#         region = validated_data.pop('region')
-#         business_phone = validated_data.pop('business_phone')
-#         formatted_phone = validated_data.pop('formatted_phone')
-        
-#         # Create restaurant but mark as unapproved by default
-#         restaurant = Restaurant.objects.create(
-#             **validated_data,
-#             owner=self.context['request'].user,
-#             region=region,
-#             business_phone=business_phone,
-#             is_approved=False
-#         )
-#         return restaurant
 
 class RestaurantCreateSerializer(serializers.ModelSerializer):
     opening_time = TimeAMPMField()
@@ -202,6 +122,25 @@ class RestaurantCreateSerializer(serializers.ModelSerializer):
     country_name = serializers.CharField(source='country.name', read_only=True)
     state_name = serializers.CharField(source='state.name', read_only=True)
     city_name = serializers.CharField(source='city.name', read_only=True)
+    
+    city = serializers.PrimaryKeyRelatedField(
+        queryset=City.objects.all(), 
+        required=False,
+        allow_null=True,
+        help_text="ID of the city"
+    )
+    state = serializers.PrimaryKeyRelatedField(
+        queryset=State.objects.all(), 
+        required=False,
+        allow_null=True,
+        help_text="ID of the state"
+    )
+    country = serializers.PrimaryKeyRelatedField(
+        queryset=Country.objects.all(), 
+        required=False,
+        allow_null=True,
+        help_text="ID of the country"
+    )
 
     class Meta:
         model = Restaurant
@@ -211,25 +150,9 @@ class RestaurantCreateSerializer(serializers.ModelSerializer):
             'pincode', 'latitude', 'longitude', 'business_phone', 'region',
             'pan_card', 'gst_number', 'fssai_license', 'menu_image', 'profile_image',
             'account_holder_name', 'account_number', 'ifsc_code', 'bank_name', 'upi_id',
-            'country_name', 'state_name', 'city_name', 'is_approved',
+            'country_name', 'state_name', 'city_name', 'is_approved', 'city','state','country'#
         ]
         read_only_fields = ['is_approved', 'country_name', 'state_name', 'city_name']
-        extra_kwargs = {
-            'name': {'required': True},
-            'email': {'required': True},
-            'opening_time': {'required': True},
-            'closing_time': {'required': True},
-            'address_line1': {'required': True},
-            'account_holder_name': {'required': True},
-            'account_number': {'required': True},
-            'ifsc_code': {'required': True},
-            'bank_name': {'required': True},
-            'pan_card': {'required': True},
-            'menu_image': {'required': True},
-            'profile_image': {'required': True},
-            'fssai_license': {'required': True},
-            # Remove any default values for required fields
-        }
 
     def validate(self, data):
         region = data.get('region')
@@ -258,11 +181,38 @@ class RestaurantCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                 'business_phone': f'Invalid phone number format: {str(e)}'
             })
-
         if data['opening_time'] >= data['closing_time']:
             raise serializers.ValidationError({
                 'closing_time': 'Closing time must be after opening time'
             })
+            
+        opening = data['opening_time']
+        closing = data['closing_time']
+        
+        # Convert times to datetime for calculation
+        opening_dt = datetime.datetime.combine(datetime.date.today(), opening)
+        closing_dt = datetime.datetime.combine(datetime.date.today(), closing)
+        
+        # Handle cases where closing is the next day (e.g., 22:00 to 06:00)
+        if closing_dt < opening_dt:
+            closing_dt += datetime.timedelta(days=1)
+        
+        time_diff = closing_dt - opening_dt
+        
+        if time_diff < datetime.timedelta(hours=10):
+            raise serializers.ValidationError({
+                'closing_time': 'Restaurant must be open for at least 12 hours.'
+            })
+
+        city = data.get('city')
+        if city:
+            # Fetch state from the selected city
+            state = city.state
+            data['state'] = state
+            
+            # Fetch country from the state
+            country = state.country
+            data['country'] = country
 
         return data
 
@@ -274,6 +224,7 @@ class RestaurantCreateSerializer(serializers.ModelSerializer):
         restaurant = Restaurant.objects.create(
             **validated_data,
             owner=self.context['request'].user,
+            created_by = self.context['request'].user,
             region=region,
             business_phone=phone_number,
             is_approved=False
@@ -285,18 +236,25 @@ class CategorySerializer(serializers.ModelSerializer):
         model = Category
         fields = ['id', 'name', 'description', 'is_active']
         
+    def create(self, validated_data):
+        validated_data['created_by'] = self.context['request'].user
+        return Offer.objects.create(**validated_data)
 
 class MenuItemSerializer(serializers.ModelSerializer):
     average_rating = serializers.SerializerMethodField()
     total_ratings = serializers.SerializerMethodField()
     discounted_price = serializers.SerializerMethodField()
     review = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = MenuItem
         fields = ['id', 'name', 'price',
                 'restaurant','is_available', 'created_at','image',
                 'average_rating','review', 'total_ratings','discounted_price', 'is_approved']
+    
+    def create(self, validated_data):
+        validated_data['created_by'] = self.context['request'].user
+        return Offer.objects.create(**validated_data)
         
     def get_review(self, obj):
         return [
@@ -369,8 +327,9 @@ class MenuItemCreateSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'price', 'category','item_type', 'restaurant',
                 'is_available', 'image']
         
-    # def get_image_url(self, obj):
-    #     return obj.image_url
+    def create(self, validated_data):
+        validated_data['created_by'] = self.context['request'].user
+        return super().create(validated_data)
         
         
 class OfferSerializer(serializers.ModelSerializer):
